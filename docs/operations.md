@@ -76,6 +76,11 @@ Starting point is 3.10 because that is what the last Jenkins run used. The ceili
 nose suite is **3.11**: nose 1.3.7's `importer.py` does `from imp import ...`, and `imp` was
 removed in Python 3.12. Beyond that means the pytest migration, not a version bump.
 
+Preferred order is pytest first, then 3.11, so the store regeneration below never has to
+happen for nose. Whether that holds depends on dev time against yt 4.5.0, which drops 3.10
+support: if 4.5.0 lands while the suite is still on nose, the worker has to move to 3.11 to
+test `main` at all, and the procedure below is the cost of that.
+
 The version is wired in three places, plus one consequence on the answers volume:
 
 | where | what |
