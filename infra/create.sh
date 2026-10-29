@@ -78,7 +78,7 @@ cat <<MSG
 
 created. next:
   1. ssh to the controller via its floating ip; install controller/ per docs/deploy.md
-  2. ssh to the worker via the controller (ProxyJump); run infra/seed-volume.sh then worker/provision.sh
+  2. ssh to the worker via the controller (ProxyJump); run infra/seed-data-volume.sh and infra/seed-answers-volume.sh, then worker/provision.sh
   3. openstack server shelve ${PREFIX}-worker
 controller private ip: $(openstack server show "${PREFIX}-controller" -f value -c addresses)
 MSG

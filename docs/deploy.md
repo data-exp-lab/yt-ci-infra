@@ -94,13 +94,18 @@ Host yt-worker
 ## 2. Seed the volumes (on the worker)
 
 ```
-scp infra/seed-volume.sh yt-worker:
+scp infra/seed-data-volume.sh infra/seed-answers-volume.sh yt-worker:
 ssh yt-worker
-sudo lsblk                                # identify the 200G and 50G devices
-sudo DATA_DEV=/dev/vdb ANSWERS_DEV=/dev/vdc ./seed-volume.sh format
-sudo ./seed-volume.sh fetch datasets.txt  # TODO: datasets.txt, see operations.md "dataset pre-flight"
-sudo ./seed-volume.sh verify datasets.txt
+sudo lsblk                                            # identify the 200G and 50G devices
+sudo DATA_DEV=/dev/vdb ./seed-data-volume.sh format
+sudo ./seed-data-volume.sh fetch datasets.txt         # TODO: datasets.txt, see operations.md "dataset pre-flight"
+sudo ./seed-data-volume.sh verify datasets.txt
+sudo ANSWERS_DEV=/dev/vdc ./seed-answers-volume.sh format
 ```
+
+The answers script only formats the volume and leaves an empty `answers/` directory. The
+stores themselves come from the first baseline run of the suite (`operations.md`, "Baseline /
+store runs"); they cannot be seeded from outside the worker.
 
 Budget: the dataset pull is the slow part; do it before provisioning so a provisioning mistake
 does not cost a re-download. The volumes persist independently of the worker.

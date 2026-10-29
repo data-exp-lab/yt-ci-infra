@@ -103,7 +103,8 @@ That last row is the real cost. The procedure:
    dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
    before merging the version bump into the yt repo.
 6. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
-   them once nobody needs to compare against the old version.
+   them once nobody needs to compare against the old version (or wipe the whole volume with
+   `infra/seed-answers-volume.sh format` and regenerate; it never touches the datasets).
 
 Both prefixes can coexist on the volume, so there is no cut-over moment: a PR that bumps the
 version just runs against the new stores, and a PR that does not still runs against the old.
@@ -115,7 +116,7 @@ every dataset the tests reference:
 ```
 # in a yt checkout: every dataset name the test suite asks for
 grep -rhoE '(requires_ds|data_dir_load|can_run_ds)\("[^"]+"' yt/ | sed -E 's/.*\("//; s/"$//' | cut -d/ -f1 | sort -u > datasets.txt
-sudo ./seed-volume.sh verify datasets.txt     # on the worker
+sudo ./seed-data-volume.sh verify datasets.txt     # on the worker
 ```
 
 TODO: turn this into a script in `infra/` once the list is stable.

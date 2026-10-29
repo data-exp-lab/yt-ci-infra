@@ -33,7 +33,7 @@ chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 sudo -u "$RUNNER_USER" bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 sudo -u "$RUNNER_USER" /home/$RUNNER_USER/.local/bin/uv python install 3.10
 
-# Mount points. Volumes are labelled by infra/seed-volume.sh; boot-runner.sh mounts by label.
+# Mount points. Volumes are labelled by infra/seed-*-volume.sh; boot-runner.sh mounts by label.
 mkdir -p /mnt/yt-data /mnt/yt-answers
 
 # Worker-side config: where the controller is, and how to mount the answers volume.
