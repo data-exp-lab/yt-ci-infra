@@ -70,7 +70,38 @@ trusted ref:
 
 Shelve files are dbm-backend dependent: generate stores on the worker, never copy from a laptop.
 
-## Dataset pre-flight
+## Change the Python version the suite runs on
+
+Starting point is 3.10 because that is what the last Jenkins run used. The ceiling for the
+nose suite is **3.11**: nose 1.3.7's `importer.py` does `from imp import ...`, and `imp` was
+removed in Python 3.12. Beyond that means the pytest migration, not a version bump.
+
+The version is wired in three places, plus one consequence on the answers volume:
+
+| where | what |
+|-------|------|
+| `worker/provision.sh` | `uv python install 3.10` puts the interpreter on the worker. Add the new one (keep the old until its stores are retired): `sudo -u runner ~runner/.local/bin/uv python install 3.11` on the live worker, and bump the script for the next rebuild. |
+| yt: `tests/run_answer_tests.sh` | `PYTHON_VERSION` default. Drives `uv sync --python` and the path of the nose patch (`.venv/lib/python3.X/site-packages/nose`). Reference copy: `yt-side/run_answer_tests.sh`. |
+| yt: `.github/workflows/build-test.yaml` | the nose jobs pin `python-version: '3.10'`. Not required for the worker, but keep them in step so one version of nose is in use. |
+| answers volume | `nose_runner.py` prefixes every store with the interpreter version: `py310_local_art_004` becomes `py311_local_art_004`. Nothing carries over. Every group is a missing store under the new prefix. |
+
+That last row is the real cost. The procedure:
+
+1. Pick a trusted ref (a green run on the current version, or the last-known-good commit).
+2. Set `ANSWERS_MODE=rw` on the worker (see "Baseline / store runs" above).
+3. Dispatch with `ref=<trusted>` and the new `PYTHON_VERSION`. Since the script reads it from
+   the environment, the cleanest way is a one-line change to the default in
+   `tests/run_answer_tests.sh` on the ref you dispatch from. Every group generates under the
+   new prefix; compare pass runs against its own output and should be green.
+4. Set `ANSWERS_MODE=ro` back.
+5. Dispatch `main` on the new version with answers RO. Differences here are interpreter or
+   dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
+   before merging the version bump into the yt repo.
+6. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
+   them once nobody needs to compare against the old version.
+
+Both prefixes can coexist on the volume, so there is no cut-over moment: a PR that bumps the
+version just runs against the new stores, and a PR that does not still runs against the old.
 
 The answer framework silently skips writing a store if any dataset in the group is missing,
 which looks like a store that never appears. Before a baseline run, verify the volume holds
