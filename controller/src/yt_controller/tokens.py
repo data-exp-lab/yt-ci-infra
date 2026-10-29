@@ -15,12 +15,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .config import Settings
 from .github import GitHub
-from .state import State
 
 log = logging.getLogger(__name__)
 
 
-def make_handler(settings: Settings, gh: GitHub, state: State):
+def make_handler(settings: Settings, gh: GitHub):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802
             if self.path != "/runner-config":
@@ -32,7 +31,6 @@ def make_handler(settings: Settings, gh: GitHub, state: State):
                 log.exception("generate-jitconfig failed")
                 self.send_error(502, "could not mint runner config")
                 return
-            state.touch()
             body = json.dumps(payload).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -49,11 +47,9 @@ def make_handler(settings: Settings, gh: GitHub, state: State):
     return Handler
 
 
-def serve(
-    settings: Settings, gh: GitHub, state: State, background: bool = False
-) -> ThreadingHTTPServer:
+def serve(settings: Settings, gh: GitHub, background: bool = False) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(
-        (settings.token_bind, settings.token_port), make_handler(settings, gh, state)
+        (settings.token_bind, settings.token_port), make_handler(settings, gh)
     )
     log.info("runner-config endpoint on %s:%d", settings.token_bind, settings.token_port)
     if background:

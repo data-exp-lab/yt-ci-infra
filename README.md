@@ -41,6 +41,7 @@ a machine and hand it a runner config.
 | `controller/` | m3.tiny | Python service: reconcile loop, idle shelver, runner-config endpoint. `uv`-managed. |
 | `worker/` | m3.xl | One-time provisioning and the per-boot script that mounts volumes and runs one job. |
 | `infra/` | your laptop / the worker | `openstack` CLI script to create everything; volume seeding; security-group rationale. |
+| `yt-side/` | the yt repo | Reference copies of the workflow and runner script that live in yt. The contract between the two repos. |
 | `docs/deploy.md` | | Standing it up from nothing, once per allocation. Ends with the v0 manual checklist. |
 | `docs/operations.md` | | Recurring tasks: rotate credentials, rebuild the worker, force a shelve, find logs. |
 

@@ -173,9 +173,20 @@ journalctl -u yt-controller -f
 
 ## 5. The yt side
 
-In the fork: enable Actions (disabled on forks by default), and add
-`.github/workflows/answer-tests.yml` plus `run_answer_tests.sh` as drafted in the planning note.
-The workflow targets `runs-on: [self-hosted, jetstream]`; the label must match `RUNNER_LABEL`.
+Two files go into the yt repo (the fork during v0/v1). Reference copies, with an explanation
+of what they do, are in `yt-side/`:
+
+| copy here | destination in yt |
+|-----------|-------------------|
+| `yt-side/answer-tests.yml` | `.github/workflows/answer-tests.yml` |
+| `yt-side/run_answer_tests.sh` | `tests/run_answer_tests.sh` |
+
+Then enable Actions on the fork (disabled on forks by default; button on its Actions tab).
+`workflow_dispatch` runs from whichever branch you pick in the dropdown, so the files can sit
+on a feature branch for v0. The `/run-answer-tests` comment path reads the workflow from the
+default branch, so merge them there before testing v1.
+
+The workflow's `runs-on: [self-hosted, jetstream]` label must match `RUNNER_LABEL`.
 
 ## 6. v0 checklist: manual dispatch, no controller loop
 
@@ -188,10 +199,12 @@ reporting, with the controller only serving configs. Leave `yt-controller.servic
 2. On the controller, watch `journalctl -u yt-controller` (or the `serve` output) for
    `issued runner config`.
 3. `gh api repos/chavlin/yt/actions/runners` shows one runner labelled `jetstream`, `online`.
-4. Actions tab on the fork: run `answer-tests` via `workflow_dispatch`. Optional `pr` input pins
-   a PR head SHA.
+4. Actions tab on the fork: run `answer-tests` via `workflow_dispatch`. Start with a `groups`
+   input naming one small group (e.g. `local_art_004`) so the first round trip takes minutes,
+   not an hour. `pr` or `ref` pins what to check out.
 5. The runner goes `busy`; the job log streams; on completion the runner deregisters and
-   `yt-runner.service` exits on the worker.
+   `yt-runner.service` restarts on the worker, fetching a fresh config and waiting for the
+   next job.
 6. Check the commit status `answer-tests` on the SHA, and the xunit artifacts on the run.
 7. Shelve the worker again (UI or `openstack server shelve yt-worker`).
 

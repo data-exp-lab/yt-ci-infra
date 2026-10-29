@@ -26,6 +26,9 @@ format_volumes() {
     mount LABEL=yt-answers /mnt/yt-answers
     mkdir -p /mnt/yt-answers/answers
     chown -R runner:runner /mnt/yt-answers
+    # nose_runner.py hardcodes <test_data_dir>/answers; point it across to the answers volume.
+    # The link lives on the (later read-only) data volume; writes follow it to yt-answers.
+    ln -sfn /mnt/yt-answers/answers /mnt/yt-data/answers
 }
 
 fetch_datasets() {

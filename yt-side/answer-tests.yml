@@ -1,0 +1,115 @@
+# Reference copy. Canonical location: yt/.github/workflows/answer-tests.yml
+name: answer-tests
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "PR number to test (its current head SHA)"
+        required: false
+      ref:
+        description: "Any ref or SHA to test (ignored if pr is set; blank = the ref this was dispatched from)"
+        required: false
+      groups:
+        description: "Comma-separated answer-test group keys from tests/tests.yaml (blank = all)"
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  authorize:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/run-answer-tests'))
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+      groups: ${{ steps.pin.outputs.groups }}
+    steps:
+      - name: Check commenter has write access
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          USER: ${{ github.event.comment.user.login }}
+        run: |
+          perm=$(gh api "repos/${{ github.repository }}/collaborators/${USER}/permission" --jq .permission)
+          case "$perm" in
+            admin|maintain|write) echo "${USER}: ${perm}" ;;
+            *) echo "::error::${USER} has '${perm}' permission; need write or above"; exit 1 ;;
+          esac
+
+      - name: Pin the SHA to test
+        id: pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.issue.number || inputs.pr }}
+          REF: ${{ inputs.ref }}
+          GROUPS: ${{ inputs.groups }}
+        run: |
+          if [ -n "$PR" ]; then
+            sha=$(gh api "repos/${{ github.repository }}/pulls/${PR}" --jq .head.sha)
+          elif [ -n "$REF" ]; then
+            sha=$(gh api "repos/${{ github.repository }}/commits/${REF}" --jq .sha)
+          else
+            sha="${{ github.sha }}"
+          fi
+          echo "testing ${sha} (pr='${PR}' ref='${REF}' groups='${GROUPS}')"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "groups=${GROUPS}" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge the comment
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh api "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions"
+          -f content=rocket
+
+  answer-tests:
+    needs: authorize
+    runs-on: [self-hosted, jetstream]
+    timeout-minutes: 240
+    steps:
+      - name: Mark pending on the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh api "repos/${{ github.repository }}/statuses/${{ needs.authorize.outputs.sha }}"
+          -f state=pending -f context=answer-tests
+          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.sha }}
+          submodules: true
+          persist-credentials: false
+
+      - name: Run answer tests
+        env:
+          GROUPS: ${{ needs.authorize.outputs.groups }}
+          YT_TEST_DATA_DIR: /mnt/yt-data
+        run: bash tests/run_answer_tests.sh
+
+      - name: Upload xunit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: answer-tests-xunit-${{ needs.authorize.outputs.sha }}
+          path: "*.xml"
+          if-no-files-found: warn
+
+      - name: Report status on the commit
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh api "repos/${{ github.repository }}/statuses/${{ needs.authorize.outputs.sha }}"
+          -f state=${{ job.status == 'success' && 'success' || 'failure' }}
+          -f context=answer-tests
+          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

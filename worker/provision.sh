@@ -13,7 +13,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential pkg-config \
     libhdf5-dev libopenmpi-dev libnetcdf-dev \
-    jq rsync
+    libfuse2 jq rsync bc
 
 id -u "$RUNNER_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/$RUNNER_USER --shell /bin/bash "$RUNNER_USER"
 

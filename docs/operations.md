@@ -14,7 +14,8 @@ For first-time setup see `deploy.md`.
 | worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `ANSWERS_MODE`) |
 | worker logs | `journalctl -u yt-runner` |
 | datasets | `/mnt/yt-data` on the worker, volume `yt-data`, always read-only |
-| answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers` |
+| answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |
+| yt-side files | `yt-side/` here; canonical copies in the yt repo |
 
 ## Is it healthy?
 
@@ -111,6 +112,18 @@ sudo systemctl restart yt-controller
 ```
 
 If a systemd unit changed: copy it to `/etc/systemd/system/` and `systemctl daemon-reload` first.
+
+## Runner lifecycle on the worker
+
+`yt-runner.service` fetches a single-use config, takes one job, exits, and restarts itself to
+fetch the next. So an ACTIVE worker normally has one idle runner registered and waiting; that
+is not a fault. The controller shelves the instance once nothing has been queued or busy for
+`GRACE_SECONDS`, which kills the idle runner; GitHub drops the dead registration on its own.
+Small race: a job dispatched in the seconds between the shelve decision and the kill fails
+and must be re-run. Acceptable for v1.
+
+If the config fetch fails (controller down, security group wrong), the service exits non-zero
+and stays down until the next unshelve. `journalctl -u yt-runner` on the worker says why.
 
 ## Known gotchas
 

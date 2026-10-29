@@ -12,8 +12,11 @@ EnvironmentFile=/etc/yt-runner/env
 # Leading '+' runs this step with full privileges so it can mount; the runner itself does not.
 ExecStartPre=+/opt/yt-runner/boot-runner.sh mount
 ExecStart=/opt/yt-runner/boot-runner.sh run
-# One job then exit. The controller shelves the instance after the grace period; no restart.
-Restart=no
+# Each JIT config is good for exactly one job. After a clean exit, fetch a fresh one and wait
+# for the next queued job; the controller shelves the instance once nothing is queued or busy.
+# A failed start (no config obtainable) stays down until the next unshelve.
+Restart=on-success
+RestartSec=15
 KillMode=process
 KillSignal=SIGINT
 TimeoutStopSec=5min

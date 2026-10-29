@@ -61,10 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "reconcile-once":
         reconcile.run_once(settings, gh, os_, state, dry_run=args.dry_run)
     elif args.cmd == "run":
-        tokens.serve(settings, gh, state, background=True)
+        tokens.serve(settings, gh, background=True)
         reconcile.run_forever(settings, gh, os_, state)
     elif args.cmd == "serve":
-        tokens.serve(settings, gh, state)
+        tokens.serve(settings, gh)
     elif args.cmd == "idle-shelver":
         idle_shelver.run(settings, gh, os_, dry_run=args.dry_run)
     elif args.cmd == "shelve":
