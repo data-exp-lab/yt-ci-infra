@@ -8,7 +8,7 @@
 #        seed-data-volume.sh verify datasets.txt
 #
 # datasets.txt is infra/datasets.txt in yt-ci-infra, one dataset name per line, '#' comments
-# allowed. How to produce it: docs/operations.md, "Dataset pre-flight".
+# allowed. Produced by infra/list-datasets.py; see docs/operations.md, "Dataset pre-flight".
 set -euo pipefail
 
 DATA_DEV="${DATA_DEV:-}"

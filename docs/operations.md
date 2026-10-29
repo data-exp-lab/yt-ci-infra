@@ -117,20 +117,20 @@ which looks like a store that never appears. So the list of datasets the suite n
 right before the first baseline run. Two parts, on two machines.
 
 **Producing `datasets.txt` (laptop, needs only a yt checkout).** Every dataset the suite asks
-for is named in a `requires_ds(...)`, `data_dir_load(...)`, or `can_run_ds(...)` call. Pull
-those names out and keep the top-level directory of each:
+for is named in a `requires_ds`, `requires_file`, `data_dir_load`, `can_run_ds`, or `load`
+call, almost always through a module-level constant rather than a literal. The extractor
+resolves those and prints the top-level directory of each, which is what the seeding script
+fetches as `<name>.tar.gz`:
 
 ```
-cd <yt checkout>
-grep -rhoE '(requires_ds|data_dir_load|can_run_ds)\("[^"]+"' yt/ | sed -E 's/.*\("//; s/"$//' | cut -d/ -f1 | sort -u \
-    > <yt-ci-infra checkout>/infra/datasets.txt
+python3 infra/list-datasets.py /path/to/yt > infra/datasets.txt
+python3 infra/list-datasets.py /path/to/yt --verbose >/dev/null   # unresolved call sites, to chase by hand
 ```
 
-Then check the list by hand against https://yt-project.org/data/. The seeding script fetches
-`<name>.tar.gz` for each line, and not every top-level directory the tests reference maps one
-to one onto a tarball there; expect some hand edits. Commit `infra/datasets.txt` here; it is
-copied to the worker alongside the seeding script (`deploy.md` step 2) and is the input to
-both `fetch` and `verify`.
+Then check the list by hand against https://yt-project.org/data/: not every top-level
+directory the tests reference maps one to one onto a tarball there; expect some hand edits.
+Commit `infra/datasets.txt` here; it is copied to the worker alongside the seeding script
+(`deploy.md` step 2) and is the input to both `fetch` and `verify`.
 
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 
@@ -138,7 +138,6 @@ both `fetch` and `verify`.
 sudo ./seed-data-volume.sh verify datasets.txt
 ```
 
-TODO: turn the extraction into a script in `infra/` once the list is stable.
 
 ## Rebuild the worker from clean
 
