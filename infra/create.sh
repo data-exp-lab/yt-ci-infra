@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Create the Jetstream2 resources for the yt answer-test runner, once per allocation.
+# Equivalent to the Horizon click-through in docs/deploy.md step 1A; use whichever you prefer.
+# Because every step is skipped when the named resource exists, this is also the rebuild path
+# for a deleted worker (docs/operations.md).
 # Requires: python-openstackclient, OS_CLOUD pointing at an application credential in clouds.yaml.
 # Every step is idempotent-ish by name lookup; re-run after fixing a failure.
 #

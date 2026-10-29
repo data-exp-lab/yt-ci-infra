@@ -8,22 +8,76 @@ Development happens against the fork `chavlin/yt`; runners register per reposito
 ## 0. Prerequisites on your laptop
 
 - `uv` and `gh`.
-- `python-openstackclient` (`uv tool install python-openstackclient`).
-- An OpenStack **application credential** for the allocation, downloaded from Horizon into
-  `~/.config/openstack/clouds.yaml` as a cloud named `jetstream`. Never commit this file.
 - An SSH keypair (`~/.ssh/id_ed25519.pub`).
+- An OpenStack **application credential** for the allocation. In Horizon
+  (https://js2.jetstream-cloud.org, pick the allocation top-left): Identity → Application
+  Credentials → Create. Name it `yt-controller`, leave roles and access rules at their defaults,
+  do not tick "unrestricted". On the confirmation screen download `clouds.yaml`; the secret is
+  shown once. Save it as `~/.config/openstack/clouds.yaml` with the cloud named `jetstream`.
+  Never commit this file. (Horizon's own openrc generator is broken on Jetstream2; use the
+  application-credential download.)
+- Only if you take the script route in step 1: `python-openstackclient`
+  (`uv tool install python-openstackclient`).
 
 ## 1. Create the cloud resources
 
+Two equivalent routes. The result either way: a private network with a router to `public`,
+two security groups, two volumes, a tiny always-on controller with the only floating IP, and a
+big worker with no floating IP and both volumes attached. Nothing downstream cares which route
+you took; the controller finds the worker by name (`WORKER_NAME`).
+
+Use **Horizon**, not Exosphere, for creating the instances. Exosphere does not let you choose
+security groups (its instances get a wide-open group) and it injects its own cloud-init
+(Guacamole, an `exouser` account). Exosphere is fine afterwards for shelve/unshelve buttons and
+for seeing volume attachments.
+
+### 1A. Horizon, click-through
+
+1. **Key pair.** Compute → Key Pairs → Import Public Key. Paste `~/.ssh/id_ed25519.pub`.
+2. **Network.** If anything was ever launched in this allocation through Exosphere, an
+   `auto_allocated_network` with a router already exists; reuse it. Otherwise: Network →
+   Networks → Create Network, name `yt-net`, subnet `yt-subnet` with range `10.0.42.0/24` and
+   DNS `8.8.8.8`. Then Network → Routers → Create Router `yt-router` with external network
+   `public`, and on its Interfaces tab add `yt-subnet`.
+3. **Security groups.** Network → Security Groups. Both start with all egress and no ingress.
+   Field-by-field rules are in `infra/security-groups.md`.
+   - Create `yt-worker-sg`. Add no rules.
+   - Create `yt-controller-sg`. Add Rule: SSH, Ingress, Remote = CIDR, `<your ip>/32`.
+     Add Rule: Custom TCP Rule, Ingress, port `8080`, Remote = **Security Group** →
+     `yt-worker-sg`.
+   - Leave the `default` group untouched (Jetstream2's own advice).
+4. **Volumes.** Volumes → Volumes → Create Volume. `yt-data`, 200 GiB, source "No source,
+   empty volume". Again for `yt-answers`, 50 GiB. Not bootable.
+5. **Controller.** Compute → Instances → Launch Instance.
+   - Details: name `yt-controller`.
+   - Source: Boot Source = Image, Create New Volume = **No**, filter on `Featured`, pick the
+     Ubuntu 24 image.
+   - Flavor: `m3.tiny`.
+   - Networks: `yt-net` (or the auto-allocated one).
+   - Security Groups: `yt-controller-sg` only. **Remove `default`** if it is pre-selected.
+   - Key Pair: yours. Launch.
+   - Once Active: Actions → Associate Floating IP → `+` to allocate one from `public` →
+     Associate. Note the floating IP and the private `10.x` address shown in the IP column.
+6. **Worker.** Launch Instance again: name `yt-worker`, same image, flavor `m3.xl`, same
+   network, security group `yt-worker-sg` only (remove `default`), same key pair.
+   **Do not associate a floating IP.** Note its private address.
+7. **Attach volumes.** Volumes → Volumes → Actions on `yt-data` → Manage Attachments → select
+   `yt-worker` → Attach. Same for `yt-answers`. Horizon shows the device each landed on
+   (typically `/dev/vdb` and `/dev/vdc`); you need these for step 2.
+
+### 1B. Script
+
+Does exactly the list above with the `openstack` CLI, skipping anything that already exists by
+name. Read it first; it is 80 lines.
+
 ```
 export OS_CLOUD=jetstream ADMIN_CIDR=<your ip>/32
-# TODO: confirm IMAGE and PUBLIC_NET names in Horizon first
+# TODO: confirm IMAGE and PUBLIC_NET names in Horizon first (Compute → Images; Network → Networks)
 ./infra/create.sh
 ```
 
-Creates `yt-net`, the two security groups (`infra/security-groups.md`), two volumes, the
-controller (floating IP) and the worker (no floating IP, both volumes attached). Note the
-controller's floating and private IPs from the output.
+It prints the controller's floating and private IPs at the end. The same script is what
+`operations.md` uses to rebuild just the worker later, since it only creates what is missing.
 
 SSH config for the rest of this document:
 
@@ -60,11 +114,16 @@ sudo CONTROLLER_URL=http://<controller private ip>:8080 ./worker/provision.sh
 ```
 
 Installs the Actions runner, `uv`, Python 3.10, mount points, `/etc/yt-runner/env`, and the
-`yt-runner.service` unit. Then shelve it:
+`yt-runner.service` unit. Then shelve it: Horizon → Compute → Instances → Actions → Shelve
+Instance (or the Shelve button in Exosphere), or
 
 ```
 openstack server shelve yt-worker
 ```
+
+Jetstream2 confirms shelved instances are not charged SUs, and that shelve and unshelve each
+take a few minutes. The volumes stay attached across shelve; watch the first unshelve to
+confirm they come back mounted.
 
 ## 4. Install the controller (on the controller)
 
@@ -124,7 +183,8 @@ Validates the worker image, volume mounts, JIT handoff, ephemeral runner, the su
 reporting, with the controller only serving configs. Leave `yt-controller.service` stopped and run
 `yt-controller serve` in a tmux instead, so nothing shelves the worker under you.
 
-1. `openstack server unshelve yt-worker` (or `yt-controller unshelve`), wait for ACTIVE.
+1. Unshelve the worker: Horizon Actions → Unshelve, Exosphere, `openstack server unshelve yt-worker`,
+   or `yt-controller unshelve`. Wait for ACTIVE.
 2. On the controller, watch `journalctl -u yt-controller` (or the `serve` output) for
    `issued runner config`.
 3. `gh api repos/chavlin/yt/actions/runners` shows one runner labelled `jetstream`, `online`.
@@ -133,7 +193,7 @@ reporting, with the controller only serving configs. Leave `yt-controller.servic
 5. The runner goes `busy`; the job log streams; on completion the runner deregisters and
    `yt-runner.service` exits on the worker.
 6. Check the commit status `answer-tests` on the SHA, and the xunit artifacts on the run.
-7. `openstack server shelve yt-worker`.
+7. Shelve the worker again (UI or `openstack server shelve yt-worker`).
 
 Once that works end to end, start `yt-controller.service` and repeat from step 4 only: the loop
 should unshelve on the queued job and shelve after `GRACE_SECONDS`. That is v1.

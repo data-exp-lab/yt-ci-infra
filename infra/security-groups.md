@@ -1,6 +1,6 @@
 # Security groups
 
-Two groups, created by `create.sh`. Default egress (all outbound) is left in place on both:
+Two groups, created by `create.sh` or by hand in Horizon (Network → Security Groups). Default egress (all outbound) is left in place on both:
 the worker needs outbound HTTPS to poll GitHub and fetch packages; the controller needs it for
 the GitHub and OpenStack APIs.
 
@@ -10,6 +10,16 @@ the GitHub and OpenStack APIs.
 |-----------|-------|------|------|-----|
 | ingress | tcp | 22 | `ADMIN_CIDR` | admin SSH; also the ProxyJump host to reach the worker |
 | ingress | tcp | 8080 | `yt-worker-sg` | `GET /runner-config`, the JIT runner handoff, private network only |
+
+Horizon "Add Rule" dialog, field by field:
+
+| field | SSH rule | token-port rule |
+|-------|----------|-----------------|
+| Rule | SSH | Custom TCP Rule |
+| Direction | Ingress | Ingress |
+| Open Port / Port | (fixed, 22) | Port, `8080` |
+| Remote | CIDR | Security Group |
+| CIDR / Security Group | `<your ip>/32` | `yt-worker-sg` |
 
 If a GitHub webhook is ever added: ingress tcp 443 from GitHub's published hook ranges
 (`gh api meta --jq .hooks`), and Caddy in front of the controller for TLS. Not in v1.
