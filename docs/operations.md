@@ -109,17 +109,31 @@ That last row is the real cost. The procedure:
 Both prefixes can coexist on the volume, so there is no cut-over moment: a PR that bumps the
 version just runs against the new stores, and a PR that does not still runs against the old.
 
+## Dataset pre-flight
+
 The answer framework silently skips writing a store if any dataset in the group is missing,
-which looks like a store that never appears. Before a baseline run, verify the volume holds
-every dataset the tests reference:
+which looks like a store that never appears. So the list of datasets the suite needs has to be
+right before the first baseline run. Two parts, on two machines.
+
+**Producing `datasets.txt` (laptop, needs only a yt checkout).** Every dataset the suite asks
+for is named in a `requires_ds(...)`, `data_dir_load(...)`, or `can_run_ds(...)` call. Pull
+those names out and keep the top-level directory of each:
 
 ```
-# in a yt checkout: every dataset name the test suite asks for
 grep -rhoE '(requires_ds|data_dir_load|can_run_ds)\("[^"]+"' yt/ | sed -E 's/.*\("//; s/"$//' | cut -d/ -f1 | sort -u > datasets.txt
-sudo ./seed-data-volume.sh verify datasets.txt     # on the worker
 ```
 
-TODO: turn this into a script in `infra/` once the list is stable.
+Then check the list by hand against https://yt-project.org/data/. The seeding script fetches
+`<name>.tar.gz` for each line, and not every top-level directory the tests reference maps one
+to one onto a tarball there; expect some hand edits. Commit the finished list to `infra/`.
+
+**Verifying the volume (worker).** After seeding, and again before any baseline run:
+
+```
+sudo ./seed-data-volume.sh verify datasets.txt
+```
+
+TODO: turn the extraction into a script in `infra/` once the list is stable.
 
 ## Rebuild the worker from clean
 
