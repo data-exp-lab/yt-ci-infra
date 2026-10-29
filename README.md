@@ -47,6 +47,12 @@ a machine and hand it a runner config.
 
 ## Controller in one screen
 
+These run on the controller instance, after SSHing in, as the `yt-controller` service user with
+`/etc/yt-controller/env` loaded (see `docs/deploy.md` step 4 for the invocation). `run` and
+`serve` are what systemd runs and only make sense there, since the worker reaches the endpoint
+over the private network. The rest only call out to the GitHub and OpenStack APIs, so they also
+work from a laptop that has the token and `clouds.yaml`, which is handy for a `--dry-run`.
+
 ```
 yt-controller status                 # queue depth, runner busy, worker state, what it would do
 yt-controller reconcile-once --dry-run
