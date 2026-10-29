@@ -94,12 +94,15 @@ Host yt-worker
 
 ## 2. Seed the volumes (on the worker)
 
+`infra/datasets.txt` must exist first; producing it is laptop work described in
+`operations.md`, "Dataset pre-flight".
+
 ```
-scp infra/seed-data-volume.sh infra/seed-answers-volume.sh yt-worker:
+scp infra/seed-data-volume.sh infra/seed-answers-volume.sh infra/datasets.txt yt-worker:
 ssh yt-worker
 sudo lsblk                                            # identify the 200G and 50G devices
 sudo DATA_DEV=/dev/vdb ./seed-data-volume.sh format
-sudo ./seed-data-volume.sh fetch datasets.txt         # TODO: datasets.txt, see operations.md "dataset pre-flight"
+sudo ./seed-data-volume.sh fetch datasets.txt
 sudo ./seed-data-volume.sh verify datasets.txt
 sudo ANSWERS_DEV=/dev/vdc ./seed-answers-volume.sh format
 ```

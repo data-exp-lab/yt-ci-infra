@@ -120,12 +120,16 @@ for is named in a `requires_ds(...)`, `data_dir_load(...)`, or `can_run_ds(...)`
 those names out and keep the top-level directory of each:
 
 ```
-grep -rhoE '(requires_ds|data_dir_load|can_run_ds)\("[^"]+"' yt/ | sed -E 's/.*\("//; s/"$//' | cut -d/ -f1 | sort -u > datasets.txt
+cd <yt checkout>
+grep -rhoE '(requires_ds|data_dir_load|can_run_ds)\("[^"]+"' yt/ | sed -E 's/.*\("//; s/"$//' | cut -d/ -f1 | sort -u \
+    > <yt-ci-infra checkout>/infra/datasets.txt
 ```
 
 Then check the list by hand against https://yt-project.org/data/. The seeding script fetches
 `<name>.tar.gz` for each line, and not every top-level directory the tests reference maps one
-to one onto a tarball there; expect some hand edits. Commit the finished list to `infra/`.
+to one onto a tarball there; expect some hand edits. Commit `infra/datasets.txt` here; it is
+copied to the worker alongside the seeding script (`deploy.md` step 2) and is the input to
+both `fetch` and `verify`.
 
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 

@@ -7,8 +7,8 @@
 #        seed-data-volume.sh fetch datasets.txt         # download+extract each listed dataset
 #        seed-data-volume.sh verify datasets.txt
 #
-# TODO: produce datasets.txt. The authoritative list is every name passed to requires_ds /
-# data_dir_load / can_run_ds across yt's test modules; see docs/operations.md "dataset pre-flight".
+# datasets.txt is infra/datasets.txt in yt-ci-infra, one dataset name per line, '#' comments
+# allowed. How to produce it: docs/operations.md, "Dataset pre-flight".
 set -euo pipefail
 
 DATA_DEV="${DATA_DEV:-}"
