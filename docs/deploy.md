@@ -40,7 +40,8 @@ for seeing volume attachments.
    DNS `8.8.8.8`. Then Network → Routers → Create Router `yt-router` with external network
    `public`, and on its Interfaces tab add `yt-subnet`.
 3. **Security groups.** Network → Security Groups. Both start with all egress and no ingress.
-   Field-by-field rules are in `infra/networking.md`.
+   Field-by-field rules are in `infra/networking.md`, which also defines the terms (CIDR,
+   ingress, remote group).
    - Create `yt-worker-sg`. Add no rules.
    - Create `yt-controller-sg`. Add Rule: SSH, Ingress, Remote = CIDR, `<your ip>/32`.
      Add Rule: Custom TCP Rule, Ingress, port `8080`, Remote = **Security Group** →
@@ -130,7 +131,8 @@ Instance (or the Shelve button in Exosphere), or
 openstack server shelve yt-worker
 ```
 
-Jetstream2 confirms shelved instances are not charged SUs, and that shelve and unshelve each
+Jetstream2 confirms shelved instances are not charged service units (SUs, the allocation's
+billing unit), and that shelve and unshelve each
 take a few minutes. The volumes stay attached across shelve; watch the first unshelve to
 confirm they come back mounted.
 
@@ -158,9 +160,13 @@ sudo cp ~/clouds.yaml ~yt-controller/.config/openstack/clouds.yaml   # applicati
 sudo chown -R yt-controller: ~yt-controller/.config; sudo chmod 600 ~yt-controller/.config/openstack/clouds.yaml
 ```
 
-GitHub credential for the fork phase: fine-grained PAT, resource owner `chavlin`, repository
+GitHub credential for the fork phase: a fine-grained personal access token (PAT: a
+password-like string GitHub issues to your account for API use; "fine-grained" means it is
+limited to named repositories and permissions). Create it at GitHub → Settings → Developer
+settings → Personal access tokens → Fine-grained tokens. Resource owner `chavlin`, repository
 access `chavlin/yt` only, permissions **Administration read/write** and **Actions read**.
-Minting JIT runner configs is what needs Administration.
+Minting just-in-time (JIT) runner configs, the single-use registrations the controller hands
+the worker at boot, is what needs Administration.
 
 Smoke test before enabling anything:
 

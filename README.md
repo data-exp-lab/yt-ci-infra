@@ -14,7 +14,7 @@ a machine and hand it a runner config.
 ```
  GitHub (yt repo)                      Jetstream2 allocation
  PR comment by maintainer              ┌──────────────────────────────────────┐
-   │                                   │ private network, outbound NAT        │
+   │                                   │ private network, outbound-only       │
    ▼                                   │  ┌──────────────┐   OpenStack API    │
  authorize job (ubuntu-latest)         │  │ controller   │──────────────┐     │
    │ pins SHA, checks permission       │  │ m3.tiny      │              ▼     │
@@ -28,8 +28,10 @@ a machine and hand it a runner config.
                                        │                       └──────┬───────┘│
                                        │                       ┌──────▼───────┐│
                                        │                       │ data volumes ││
-                                       │                       │ datasets RO  ││
-                                       │                       │ answers RO/RW││
+                                       │                       │ datasets:    ││
+                                       │                       │  read-only   ││
+                                       │                       │ answers:     ││
+                                       │                       │  ro / rw     ││
                                        │                       └──────────────┘│
                                        └──────────────────────────────────────┘
 ```

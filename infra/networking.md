@@ -15,8 +15,9 @@ public address and the instance's private one. "Floating" means it can be moved 
 instances, not that it changes on its own. Once associated it stays put across reboots and
 shelve/unshelve.
 
-**Outbound needs nothing.** The router also NATs the whole private network, so any instance can
-connect out to the internet with or without a floating IP of its own.
+**Outbound needs nothing.** The router also does network address translation (NAT) for the
+whole private network, rewriting outgoing packets to carry its own public address, so any
+instance can connect out to the internet with or without a floating IP of its own.
 
 **So the only question is who needs inbound.**
 
@@ -44,8 +45,9 @@ their rules applies.
 Jetstream2's default is all egress allowed, no ingress allowed. That is exactly what the worker
 needs, since it only ever connects out, so its group has no rules.
 
-**Source.** An ingress rule names a port and a source. The source is either an IP range (CIDR,
-e.g. `1.2.3.4/32` for one address) or another security group. A group as source means "any
+**Source.** An ingress rule names a port and a source. The source is either an IP range written in
+CIDR notation (address plus a `/N` prefix length; `1.2.3.4/32` is exactly one address,
+`0.0.0.0/0` is everyone) or another security group. A group as source means "any
 instance carrying that group", which survives rebuilds and IP changes. The 8080 rule uses this.
 
 **Why ours looks like this.** The controller has the only public address and two ingress
@@ -69,7 +71,7 @@ the GitHub and OpenStack APIs.
 | direction | proto | port | from | why |
 |-----------|-------|------|------|-----|
 | ingress | tcp | 22 | `ADMIN_CIDR` | admin SSH; also the ProxyJump host to reach the worker |
-| ingress | tcp | 8080 | `yt-worker-sg` | `GET /runner-config`, the JIT runner handoff, private network only |
+| ingress | tcp | 8080 | `yt-worker-sg` | `GET /runner-config`, the just-in-time runner config handoff, private network only |
 
 Horizon "Add Rule" dialog, field by field:
 
@@ -82,7 +84,7 @@ Horizon "Add Rule" dialog, field by field:
 | CIDR / Security Group | `<your ip>/32` | `yt-worker-sg` |
 
 If a GitHub webhook is ever added: ingress tcp 443 from GitHub's published hook ranges
-(`gh api meta --jq .hooks`), and Caddy in front of the controller for TLS. Not in v1.
+(`gh api meta --jq .hooks`), and Caddy in front of the controller to terminate HTTPS. Not in v1.
 
 ## `yt-worker-sg` (worker, no floating IP)
 

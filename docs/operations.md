@@ -48,7 +48,8 @@ stop `yt-controller-idle-shelver.timer` too if you need the worker up for intera
 3. `systemctl restart yt-controller`; check `yt-controller status` works.
 4. Revoke the old token on GitHub.
 
-Nothing on the worker changes: it never holds the token, only one-shot JIT configs.
+Nothing on the worker changes: it never holds the token, only one-shot just-in-time (JIT)
+runner configs.
 
 ## Rotate the OpenStack application credential
 
@@ -99,7 +100,7 @@ That last row is the real cost. The procedure:
    `tests/run_answer_tests.sh` on the ref you dispatch from. Every group generates under the
    new prefix; compare pass runs against its own output and should be green.
 4. Set `ANSWERS_MODE=ro` back.
-5. Dispatch `main` on the new version with answers RO. Differences here are interpreter or
+5. Dispatch `main` on the new version with answers read-only. Differences here are interpreter or
    dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
    before merging the version bump into the yt repo.
 6. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
@@ -191,5 +192,6 @@ and stays down until the next unshelve. `journalctl -u yt-runner` on the worker 
 - JIT configs expire in about an hour and are single-use. If the worker boots but the runner
   never appears, check `journalctl -u yt-runner` on the worker and `journalctl -u yt-controller`
   for `generate-jitconfig failed` (usually a token permission problem).
-- Usage reporting to ACCESS lags 12–24 h; `openstack` status is the source of truth for whether
-  the worker is burning SUs right now.
+- Usage reporting to ACCESS (the NSF program that allocates Jetstream2 time) lags 12–24 h;
+  `openstack` status is the source of truth for whether the worker is burning service units
+  (SUs) right now.
