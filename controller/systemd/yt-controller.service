@@ -1,0 +1,22 @@
+[Unit]
+Description=yt answer-test controller: reconcile loop + runner-config endpoint
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=yt-controller
+Group=yt-controller
+EnvironmentFile=/etc/yt-controller/env
+WorkingDirectory=/opt/yt-controller
+ExecStart=/opt/yt-controller/.venv/bin/yt-controller run
+Restart=always
+RestartSec=15
+StateDirectory=yt-controller
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=yt answer-test ephemeral GitHub Actions runner (one job per boot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=runner
+Group=runner
+WorkingDirectory=/opt/yt-runner
+EnvironmentFile=/etc/yt-runner/env
+# Leading '+' runs this step with full privileges so it can mount; the runner itself does not.
+ExecStartPre=+/opt/yt-runner/boot-runner.sh mount
+ExecStart=/opt/yt-runner/boot-runner.sh run
+# One job then exit. The controller shelves the instance after the grace period; no restart.
+Restart=no
+KillMode=process
+KillSignal=SIGINT
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=multi-user.target

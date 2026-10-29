@@ -1,0 +1,36 @@
+[project]
+name = "yt-controller"
+version = "0.1.0"
+description = "Wakes and shelves the yt answer-test worker on Jetstream2 in response to queued GitHub Actions jobs."
+license = "BSD-3-Clause"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+    "openstacksdk>=4.0",
+]
+
+[project.scripts]
+yt-controller = "yt_controller.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yt_controller"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
