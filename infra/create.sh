@@ -36,7 +36,7 @@ exists router "${PREFIX}-router" || {
     openstack router add subnet "${PREFIX}-router" "${PREFIX}-subnet"
 }
 
-# --- security groups (see security-groups.md) ------------------------------
+# --- security groups (see networking.md) -----------------------------------
 exists "security group" "${PREFIX}-controller-sg" || {
     openstack security group create "${PREFIX}-controller-sg" --description "yt controller: ssh from admin, token port from worker"
     openstack security group rule create "${PREFIX}-controller-sg" --proto tcp --dst-port 22 --remote-ip "$ADMIN_CIDR"

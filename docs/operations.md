@@ -164,6 +164,10 @@ and stays down until the next unshelve. `journalctl -u yt-runner` on the worker 
 
 ## Known gotchas
 
+- The controller's floating IP is stable as long as the controller is never shelved: Jetstream2
+  reclaims floating IPs from instances shelved more than 45 days. Safe to hard-code in your SSH
+  config. If SSH ever stops resolving, check in Horizon (Network → Floating IPs) that the
+  address is still associated. Background in `infra/networking.md`.
 - Unshelve takes 1–3 min; polling adds up to `POLL_SECONDS`. A queued job sits for a few minutes
   before the runner appears. That is expected.
 - JIT configs expire in about an hour and are single-use. If the worker boots but the runner

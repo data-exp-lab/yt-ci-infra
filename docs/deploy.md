@@ -40,7 +40,7 @@ for seeing volume attachments.
    DNS `8.8.8.8`. Then Network → Routers → Create Router `yt-router` with external network
    `public`, and on its Interfaces tab add `yt-subnet`.
 3. **Security groups.** Network → Security Groups. Both start with all egress and no ingress.
-   Field-by-field rules are in `infra/security-groups.md`.
+   Field-by-field rules are in `infra/networking.md`.
    - Create `yt-worker-sg`. Add no rules.
    - Create `yt-controller-sg`. Add Rule: SSH, Ingress, Remote = CIDR, `<your ip>/32`.
      Add Rule: Custom TCP Rule, Ingress, port `8080`, Remote = **Security Group** →
@@ -58,6 +58,7 @@ for seeing volume attachments.
    - Key Pair: yours. Launch.
    - Once Active: Actions → Associate Floating IP → `+` to allocate one from `public` →
      Associate. Note the floating IP and the private `10.x` address shown in the IP column.
+     This is the only public address in the system; `infra/networking.md` explains why.
 6. **Worker.** Launch Instance again: name `yt-worker`, same image, flavor `m3.xl`, same
    network, security group `yt-worker-sg` only (remove `default`), same key pair.
    **Do not associate a floating IP.** Note its private address.

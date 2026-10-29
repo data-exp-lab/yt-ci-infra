@@ -1,6 +1,39 @@
-# Security groups
+# Networking
 
-## Intro
+Two things decide what can reach what: whether an instance has a public address at all, and
+what its security groups admit. Addresses first, then groups.
+
+## Addresses and floating IPs
+
+**Private address.** Every instance on `yt-net` gets one at creation, something like
+`10.0.42.7`. It only works inside the allocation's network; nothing on the internet can route
+to it.
+
+**Floating IP.** A public, internet-routable address Jetstream2 owns. You allocate one from the
+`public` pool and associate it with an instance; the router then forwards packets between the
+public address and the instance's private one. "Floating" means it can be moved between
+instances, not that it changes on its own. Once associated it stays put across reboots and
+shelve/unshelve.
+
+**Outbound needs nothing.** The router also NATs the whole private network, so any instance can
+connect out to the internet with or without a floating IP of its own.
+
+**So the only question is who needs inbound.**
+
+- Controller: yes. You SSH to it. It has the one floating IP in the system.
+- Worker: no. The Actions runner polls GitHub over outbound connections; GitHub never connects
+  to the runner. The controller is reachable over the private network. Package and dataset
+  fetches are outbound.
+
+Leaving the floating IP off the worker makes it unreachable from the internet by construction,
+independent of security groups or anything the job code does. Shell access is via the
+controller as a jump host (`ProxyJump` in `docs/deploy.md`).
+
+Jetstream2 reclaims floating IPs from instances shelved more than 45 days. The worker is
+shelved most of its life, so an address on it would also be a liability. The controller is
+never shelved, so its address is effectively fixed.
+
+## Security groups
 
 **What a security group is.** A firewall rule set that OpenStack enforces outside the VM, at
 the network layer. Traffic the group rejects never reaches the instance, so a misconfigured
