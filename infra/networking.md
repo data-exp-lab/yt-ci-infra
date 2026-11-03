@@ -82,16 +82,21 @@ Horizon "Add Rule" dialog, field by field:
 | Open Port / Port | (fixed, 22) | Port, `8080` |
 | Remote | CIDR | Security Group |
 | CIDR / Security Group | `<your ip>/32` | `yt-worker-sg` |
+| Ether Type | (hidden) | IPv4, the default; the private network is IPv4 only |
 
 If a GitHub webhook is ever added: ingress tcp 443 from GitHub's published hook ranges
 (`gh api meta --jq .hooks`), and Caddy in front of the controller to terminate HTTPS. Not in v1.
 
 ## `yt-worker-sg` (worker, no floating IP)
 
-No ingress rules. The worker only ever makes outbound connections: to the controller on 8080,
-to GitHub over 443, to package indexes. SSH reaches it only via `ProxyJump` through the
-controller, which works because both sit on `yt-net`. Add an ingress 22 rule from
-`yt-controller-sg` if you want that:
+| direction | proto | port | remote | purpose |
+|---|---|---|---|---|
+| ingress | tcp | 22 | `yt-controller-sg` | admin SSH via `ProxyJump` through the controller; `docs/deploy.md` steps 2 to 4 depend on it |
+| egress | any | any | `0.0.0.0/0` (default) | controller on 8080, GitHub over 443, package indexes |
+
+That is the only ingress rule. Security groups filter private-network traffic too, so without
+it the controller cannot reach the worker's port 22 even though both sit on `yt-net`. Remote
+group rather than the controller's private IP for the same reason as the 8080 rule below.
 
 ```
 openstack security group rule create yt-worker-sg --proto tcp --dst-port 22 --remote-group yt-controller-sg

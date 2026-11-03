@@ -1,0 +1,367 @@
+[
+ {
+  "datafile": "A2052.tar.gz",
+  "note": "unpacks to xray_fits"
+ },
+ {
+  "datafile": "acisf05356N003_evt2.fits.gz",
+  "unpack_to": "xray_fits",
+  "note": "bare file on the site; tests load xray_fits/acisf05356N003_evt2.fits.gz (still gzipped)"
+ },
+ {
+  "datafile": "ActiveParticleCosmology.tar.gz"
+ },
+ {
+  "datafile": "ActiveParticleTwoSphere.tar.gz"
+ },
+ {
+  "datafile": "agora_1e11.00400.tar.gz"
+ },
+ {
+  "datafile": "ahf_halos.tar.gz"
+ },
+ {
+  "datafile": "AM06.tar.gz"
+ },
+ {
+  "datafile": "ArepoBullet.tar.gz"
+ },
+ {
+  "datafile": "ArepoCosmicRays.tar.gz"
+ },
+ {
+  "datafile": "athenapk_cluster.tar.gz"
+ },
+ {
+  "datafile": "athenapk_disk.tar.gz"
+ },
+ {
+  "datafile": "BigEndianGadgetBinary.tar.gz"
+ },
+ {
+  "datafile": "C15-3D-3deg.tar.gz"
+ },
+ {
+  "datafile": "c5.tar.gz"
+ },
+ {
+  "datafile": "castro_sedov_1d_cyl_plt00150.tar.gz"
+ },
+ {
+  "datafile": "castro_sedov_2d_sph_in_cyl_plt00130.tar.gz",
+  "note": "listed on the data page but HTTP 404 as of 2026-11-03; tests skip until the site is fixed"
+ },
+ {
+  "datafile": "castro_sod_x_plt00036.tar.gz"
+ },
+ {
+  "datafile": "CfRadialGrid.tar.gz"
+ },
+ {
+  "datafile": "ChollaSimple.tar.gz"
+ },
+ {
+  "datafile": "cm1_tornado_lofs.tar.gz"
+ },
+ {
+  "datafile": "CRShockTube.tar.gz"
+ },
+ {
+  "datafile": "D9p_500.tar.gz"
+ },
+ {
+  "datafile": "DeeplyNestedZoom.tar.gz"
+ },
+ {
+  "datafile": "DensTurbMag.tar.gz"
+ },
+ {
+  "datafile": "DICEGalaxyDisk_nonCosmological.tar.gz"
+ },
+ {
+  "datafile": "DMonly.tar.gz"
+ },
+ {
+  "datafile": "EAGLE_6.tar.gz"
+ },
+ {
+  "datafile": "enzo_cosmology_plus.tar.gz"
+ },
+ {
+  "datafile": "enzo_tiny_cosmology.tar.gz"
+ },
+ {
+  "datafile": "ENZOE_orszag-tang_0.5.tar.gz"
+ },
+ {
+  "datafile": "EnzoKelvinHelmholtz.tar.gz"
+ },
+ {
+  "datafile": "ENZOP_DD0140.tar.gz"
+ },
+ {
+  "datafile": "example-2d.tar.gz"
+ },
+ {
+  "datafile": "example-3d.tar.gz"
+ },
+ {
+  "datafile": "ExodusII_tests.tar.gz",
+  "note": "unpacks to ExodusII"
+ },
+ {
+  "datafile": "F37_80.tar.gz"
+ },
+ {
+  "datafile": "fiducial_1to3_b1.tar.gz"
+ },
+ {
+  "datafile": "FIRE_M12i_ref11.tar.gz"
+ },
+ {
+  "datafile": "Gadget3-snap-format2.tar.gz"
+ },
+ {
+  "datafile": "gadget_fof_halos.tar.gz"
+ },
+ {
+  "datafile": "gadget_halos.tar.gz"
+ },
+ {
+  "datafile": "GadgetDiskGalaxy.tar.gz"
+ },
+ {
+  "datafile": "GasSloshingLowRes.tar.gz"
+ },
+ {
+  "datafile": "GaussianBeam.tar.gz"
+ },
+ {
+  "datafile": "GaussianCloud.tar.gz",
+  "unpack_to": "GaussianCloud",
+  "note": "tarball holds a bare data.0077.3d.hdf5; tests load GaussianCloud/data.0077.3d.hdf5"
+ },
+ {
+  "datafile": "gizmo_64.tar.gz"
+ },
+ {
+  "datafile": "gizmo_mhd_mwdisk.tar.gz"
+ },
+ {
+  "datafile": "gizmo_zeldovich.tar.gz"
+ },
+ {
+  "datafile": "grs-50-cube.fits.gz",
+  "unpack_to": "radio_fits",
+  "note": "bare file on the site; tests load radio_fits/grs-50-cube.fits (gunzipped)"
+ },
+ {
+  "datafile": "halo1e11_run1.00400.tar.gz"
+ },
+ {
+  "datafile": "hello-0210.tar.gz"
+ },
+ {
+  "datafile": "InteractingJets.tar.gz"
+ },
+ {
+  "datafile": "IsolatedGalaxy.tar.gz"
+ },
+ {
+  "datafile": "IsothermalCollapse.tar.gz"
+ },
+ {
+  "datafile": "IsothermalSphere.tar.gz"
+ },
+ {
+  "datafile": "JetICMWall.tar.gz"
+ },
+ {
+  "datafile": "KelvinHelmholtz.tar.gz"
+ },
+ {
+  "datafile": "KeplerianDisk.tar.gz"
+ },
+ {
+  "datafile": "KeplerianRing.tar.gz"
+ },
+ {
+  "datafile": "LangmuirWave_v2.tar.gz",
+  "note": "unpacks to LangmuirWave"
+ },
+ {
+  "datafile": "Laser.tar.gz"
+ },
+ {
+  "datafile": "LocBub_dust.tar.gz"
+ },
+ {
+  "datafile": "maestro_subCh_plt00248.tar.gz"
+ },
+ {
+  "datafile": "magneticum_camels.tar.gz"
+ },
+ {
+  "datafile": "MagneticumCluster.tar.gz"
+ },
+ {
+  "datafile": "MHD_Cyl3d_hdf5_plt_cnt_0100.tar.gz"
+ },
+ {
+  "datafile": "MHDBlast.tar.gz"
+ },
+ {
+  "datafile": "MHDCTOrszagTang.tar.gz"
+ },
+ {
+  "datafile": "MHDOrszagTangVortex.tar.gz"
+ },
+ {
+  "datafile": "MHDSloshing.tar.gz"
+ },
+ {
+  "datafile": "MOOSE_Sample_data.tar.gz",
+  "note": "unpacks to MOOSE_sample_data"
+ },
+ {
+  "datafile": "Nyx_LyA.tar.gz"
+ },
+ {
+  "datafile": "nyx_sedov_plt00086.tgz"
+ },
+ {
+  "datafile": "nyx_small.tar.gz"
+ },
+ {
+  "datafile": "Orbit.tar.gz"
+ },
+ {
+  "datafile": "output_00080.tar.gz"
+ },
+ {
+  "datafile": "output_00080_halos.tar.gz"
+ },
+ {
+  "datafile": "owls_fof_halos.tar.gz"
+ },
+ {
+  "datafile": "parthenon_advection.tar.gz"
+ },
+ {
+  "datafile": "ParticleCavity.tar.gz",
+  "note": "unpacks to plt.Cavity00010"
+ },
+ {
+  "datafile": "PlasmaAcceleration_v2.tar.gz",
+  "note": "unpacks to PlasmaAcceleration"
+ },
+ {
+  "datafile": "Plummer.tar.gz"
+ },
+ {
+  "datafile": "PopIII_mini.tar.gz"
+ },
+ {
+  "datafile": "RadAdvect.tar.gz"
+ },
+ {
+  "datafile": "RadTube.tar.gz"
+ },
+ {
+  "datafile": "RamPressureStripping.tar.gz"
+ },
+ {
+  "datafile": "ramses_empty_record.tar.gz"
+ },
+ {
+  "datafile": "ramses_extra_fields_small.tar.gz"
+ },
+ {
+  "datafile": "ramses_mhd_128.tar.gz"
+ },
+ {
+  "datafile": "ramses_new_format.tar.gz"
+ },
+ {
+  "datafile": "ramses_rt_00088.tar.gz"
+ },
+ {
+  "datafile": "ramses_sink_00016.tar.gz"
+ },
+ {
+  "datafile": "ramses_star_formation.tar.gz"
+ },
+ {
+  "datafile": "rockstar_halos.tar.gz"
+ },
+ {
+  "datafile": "RT_particles.tar.gz"
+ },
+ {
+  "datafile": "SecondOrderTets.tar.gz"
+ },
+ {
+  "datafile": "sedov_1d_sph_plt00120.tar.gz"
+ },
+ {
+  "datafile": "sedov_tst_0004.tar.gz",
+  "note": "unpacks to sedov"
+ },
+ {
+  "datafile": "ShockCloud.tar.gz"
+ },
+ {
+  "datafile": "sizmbhloz-clref04SNth-rs9_a0.9011.tar.gz"
+ },
+ {
+  "datafile": "snapshot_028_z000p000.tar.gz"
+ },
+ {
+  "datafile": "snapshot_033.tar.gz"
+ },
+ {
+  "datafile": "snipshot_399_z000p000.tar.gz"
+ },
+ {
+  "datafile": "StarParticles.tar.gz"
+ },
+ {
+  "datafile": "tiny_fof_halos.tar.gz"
+ },
+ {
+  "datafile": "TipsyGalaxy.tar.gz"
+ },
+ {
+  "datafile": "TNGHalo.tar.gz"
+ },
+ {
+  "datafile": "ToroShockTube.tar.gz"
+ },
+ {
+  "datafile": "TurbBoxLowRes.tar.gz",
+  "unpack_to": "TurbBoxLowRes",
+  "note": "tarball holds a bare data.0005.3d.hdf5; tests load TurbBoxLowRes/data.0005.3d.hdf5"
+ },
+ {
+  "datafile": "UnigridData.tar.gz"
+ },
+ {
+  "datafile": "WaveDarkMatter.tar.gz"
+ },
+ {
+  "datafile": "WDMerger_hdf5_chk_1000.tar.gz"
+ },
+ {
+  "datafile": "WindTunnel.tar.gz"
+ },
+ {
+  "datafile": "xrb_spherical_smallplt00010.tar.gz",
+  "note": "listed on the data page but HTTP 404 as of 2026-11-03; tests skip until the site is fixed"
+ },
+ {
+  "datafile": "ytdata_test.tar.gz"
+ },
+ {
+  "datafile": "ZeldovichPancake.tar.gz"
+ }
+]

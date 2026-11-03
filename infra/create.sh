@@ -42,11 +42,13 @@ exists "security group" "${PREFIX}-controller-sg" || {
     openstack security group rule create "${PREFIX}-controller-sg" --proto tcp --dst-port 22 --remote-ip "$ADMIN_CIDR"
 }
 exists "security group" "${PREFIX}-worker-sg" || {
-    openstack security group create "${PREFIX}-worker-sg" --description "yt worker: no inbound"
+    openstack security group create "${PREFIX}-worker-sg" --description "yt worker: ssh from controller only"
 }
-# Worker -> controller on the token port only. Added after both groups exist.
+# Cross-group rules, added after both groups exist.
 openstack security group rule create "${PREFIX}-controller-sg" \
     --proto tcp --dst-port "$TOKEN_PORT" --remote-group "${PREFIX}-worker-sg" 2>/dev/null || true
+openstack security group rule create "${PREFIX}-worker-sg" \
+    --proto tcp --dst-port 22 --remote-group "${PREFIX}-controller-sg" 2>/dev/null || true
 
 # --- keypair ---------------------------------------------------------------
 exists keypair "$KEYPAIR" || openstack keypair create --public-key ~/.ssh/id_ed25519.pub "$KEYPAIR"

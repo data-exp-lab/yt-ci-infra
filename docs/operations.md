@@ -113,29 +113,60 @@ version just runs against the new stores, and a PR that does not still runs agai
 ## Dataset pre-flight
 
 The answer framework silently skips writing a store if any dataset in the group is missing,
-which looks like a store that never appears. So the list of datasets the suite needs has to be
-right before the first baseline run. Two parts, on two machines.
+which looks like a store that never appears. So `infra/datasets.json` has to be right before
+the first baseline run. It is a list, one entry per file to download from
+https://yt-project.org/data/:
 
-**Producing `datasets.txt` (laptop, needs only a yt checkout).** Every dataset the suite asks
-for is named in a `requires_ds`, `requires_file`, `data_dir_load`, `can_run_ds`, or `load`
-call, almost always through a module-level constant rather than a literal. The extractor
-resolves those and prints the top-level directory of each, which is what the seeding script
-fetches as `<name>.tar.gz`:
-
-```
-python3 infra/list-datasets.py /path/to/yt > infra/datasets.txt
-python3 infra/list-datasets.py /path/to/yt --verbose >/dev/null   # unresolved call sites, to chase by hand
+```json
+{"datafile": "ExodusII_tests.tar.gz", "note": "unpacks to ExodusII"}
+{"datafile": "grs-50-cube.fits.gz", "unpack_to": "radio_fits", "note": "bare file on the site"}
 ```
 
-Then check the list by hand against https://yt-project.org/data/: not every top-level
-directory the tests reference maps one to one onto a tarball there; expect some hand edits.
-Commit `infra/datasets.txt` here; it is copied to the worker alongside the seeding script
-(`deploy.md` step 2) and is the input to both `fetch` and `verify`.
+`datafile` is the file name on the site. `unpack_to` is a directory under the volume root to
+unpack into, for the few files that are not a tarball of one top-level directory; omitted,
+the file unpacks at the root. `note` is free text. `infra/seed-data-volume.sh` extracts
+tarballs and gunzips anything else, keeping the compressed copy (one FITS test wants the
+`.fits.gz`, another wants the `.fits`). The list is copied to the worker alongside the
+seeding script (`deploy.md` step 2) and is the input to both `fetch` and `verify`.
+
+**Keeping it current.** The normal path is incremental. After a run, look for datasets the
+suite wanted and did not find; both decorators skip with a reason that names the dataset:
+
+```
+grep -hoE "(cannot load dataset|Missing required file) [^ ]+" <run log> | sort -u
+```
+
+Find the tarball on the data page, add an entry, re-run `fetch` on the worker (it skips what
+is already seeded). Also re-check the "known gaps" list below.
+
+**Rebuilding from scratch** (laptop, how the 2026-11-03 list was made; the first-run skip
+check above is the safety net for anything this misses):
+
+1. Names the tests reference: every string literal in `yt/**/test_*.py`, first path
+   component. Grep the literals rather than the `requires_ds` / `requires_file` calls; most
+   go through a module-level constant. Drop `DD0010`, which ships with yt in `tests/`.
+2. The site manifest: `curl -sL https://yt-project.org/data/datafiles.json`. The data page is
+   rendered from it. Use each entry's `url`; the `filename` field is a display name and differs
+   from the URL basename in a few cases.
+3. What each tarball unpacks to, without downloading it: `curl -sL <url> | tar tzf - | head -1`
+   reads the first gzip block and drops the connection. About ten tarballs unpack to a name
+   other than their stem, two unpack to a bare file.
+4. Match step 1 against step 3. Each match is an entry. A test name with no match is inside a
+   tarball under another name (step 3 shows it), a bare file on the site (write `unpack_to`),
+   or not published at all (nothing to do; those tests skip).
+5. `curl -sI` each URL once. The manifest has carried dead links.
+
+Not every test name resolves. Known gaps as of 2026-11-03: `castro_sedov_2d_sph_in_cyl_plt00130`
+and `xrb_spherical_smallplt00010` are on the data page but 404 (kept in the list with a note);
+`no_fields`, `no_particles`, `output_00080_new_halos`, `quokka`, `riot_sedov_curvlinear`,
+`singleParticle` are not on the site; the `amrvac/*.dat` files the tests want are not the
+files in the published amrvac tarballs. All of those tests skip. The fix for each is on the
+yt side, data page or test, not here.
 
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 
 ```
-sudo ./seed-data-volume.sh verify datasets.txt
+sudo ./seed-data-volume.sh verify datasets.json
 ```
 
 

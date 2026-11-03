@@ -13,8 +13,9 @@ Development happens against the fork `chavlin/yt`; runners register per reposito
   (https://js2.jetstream-cloud.org, pick the allocation top-left): Identity → Application
   Credentials → Create. Name it `yt-controller`, leave roles and access rules at their defaults,
   do not tick "unrestricted". On the confirmation screen download `clouds.yaml`; the secret is
-  shown once. Save it as `~/.config/openstack/clouds.yaml` with the cloud named `jetstream`.
-  Never commit this file. (Horizon's own openrc generator is broken on Jetstream2; use the
+  shown once. Save it as `~/.config/openstack/clouds.yaml`, open the file, and rename the
+  `openstack` key under `clouds:` to `jetstream` (that is the name `OS_CLOUD=jetstream` looks
+  up). Never commit this file. (Horizon's own openrc generator is broken on Jetstream2; use the
   application-credential download.)
 - Only if you take the script route in step 1: `python-openstackclient`
   (`uv tool install python-openstackclient`).
@@ -33,19 +34,26 @@ for seeing volume attachments.
 
 ### 1A. Horizon, click-through
 
-1. **Key pair.** Compute → Key Pairs → Import Public Key. Paste `~/.ssh/id_ed25519.pub`.
-2. **Network.** If anything was ever launched in this allocation through Exosphere, an
-   `auto_allocated_network` with a router already exists; reuse it. Otherwise: Network →
-   Networks → Create Network, name `yt-net`, subnet `yt-subnet` with range `10.0.42.0/24` and
-   DNS `8.8.8.8`. Then Network → Routers → Create Router `yt-router` with external network
-   `public`, and on its Interfaces tab add `yt-subnet`.
+1. **Key pair.** Compute → Key Pairs → Import Public Key. Name `yt-key` (the default
+   `infra/create.sh` looks for), Key Type `SSH Key`, and paste `~/.ssh/id_ed25519.pub`
+   (`pbcopy < ~/.ssh/id_ed25519.pub` puts it on the clipboard).
+2. **Network.** If anything was ever launched in this allocation through Exosphere, Network →
+   Networks shows an `auto_allocated_network` with `auto_allocated_subnet_v4`. Check Network →
+   Routers for `auto_allocated_router` with external gateway `public` and an interface on
+   that subnet. If both exist, skip to step 3 and pick `auto_allocated_network` wherever
+   steps 5 and 6 say `yt-net`. If only the router is missing, create it as below but attach
+   `auto_allocated_subnet_v4`. Otherwise: Network → Networks → Create Network, name
+   `yt-net`, subnet `yt-subnet` with range `10.0.42.0/24` and DNS `8.8.8.8`. Then Network →
+   Routers → Create Router `yt-router` with external network `public`, and on its
+   Interfaces tab add `yt-subnet`.
 3. **Security groups.** Network → Security Groups. Both start with all egress and no ingress.
    Field-by-field rules are in `infra/networking.md`, which also defines the terms (CIDR,
    ingress, remote group).
-   - Create `yt-worker-sg`. Add no rules.
+   - Create `yt-worker-sg`. Add Rule: SSH, Ingress, Remote = **Security Group** →
+     `yt-controller-sg`, Ether Type IPv4. Nothing else; leave the 2 egress entries alone.
    - Create `yt-controller-sg`. Add Rule: SSH, Ingress, Remote = CIDR, `<your ip>/32`.
      Add Rule: Custom TCP Rule, Ingress, port `8080`, Remote = **Security Group** →
-     `yt-worker-sg`.
+     `yt-worker-sg`, Ether Type left at IPv4.
    - Leave the `default` group untouched (Jetstream2's own advice).
 4. **Volumes.** Volumes → Volumes → Create Volume. `yt-data`, 200 GiB, source "No source,
    empty volume". Again for `yt-answers`, 50 GiB. Not bootable.
@@ -81,7 +89,18 @@ export OS_CLOUD=jetstream ADMIN_CIDR=<your ip>/32
 It prints the controller's floating and private IPs at the end. The same script is what
 `operations.md` uses to rebuild just the worker later, since it only creates what is missing.
 
-SSH config for the rest of this document:
+### 1C. Record the addresses and write the SSH config (either route)
+
+You now have three addresses: the controller's floating IP and private `10.x` address, and
+the worker's private address. Keep them somewhere outside this repo. Each is used later:
+
+- Controller floating IP: the `HostName` below. The only public address in the system.
+- Controller private IP: `CONTROLLER_URL` in step 3 and `TOKEN_BIND` in step 4, the
+  worker-to-controller handoff over the private network.
+- Worker private IP: the `HostName` below, reached through the controller as a jump host.
+
+Add to `~/.ssh/config`; the rest of this document assumes `ssh yt-controller` and
+`ssh yt-worker` work:
 
 ```
 Host yt-controller
@@ -93,18 +112,22 @@ Host yt-worker
     ProxyJump yt-controller
 ```
 
+Test with `ssh yt-controller`. A timeout usually means your public IP is no longer the one in
+`yt-controller-sg`; add a second SSH rule for the current IP rather than editing the first.
+
 ## 2. Seed the volumes (on the worker)
 
-`infra/datasets.txt` must exist first; producing it is laptop work described in
-`operations.md`, "Dataset pre-flight".
+`infra/datasets.json` lists what to fetch; how it was made and how to keep it current is in
+`operations.md`, "Dataset pre-flight". Fetching 38 GB of tarballs takes a while; the script
+reports failures at the end and can be re-run to pick up only what is missing.
 
 ```
-scp infra/seed-data-volume.sh infra/seed-answers-volume.sh infra/datasets.txt yt-worker:
+scp infra/seed-data-volume.sh infra/seed-answers-volume.sh infra/datasets.json yt-worker:
 ssh yt-worker
 sudo lsblk                                            # identify the 200G and 50G devices
 sudo DATA_DEV=/dev/vdb ./seed-data-volume.sh format
-sudo ./seed-data-volume.sh fetch datasets.txt
-sudo ./seed-data-volume.sh verify datasets.txt
+sudo ./seed-data-volume.sh fetch datasets.json
+sudo ./seed-data-volume.sh verify datasets.json
 sudo ANSWERS_DEV=/dev/vdc ./seed-answers-volume.sh format
 ```
 
