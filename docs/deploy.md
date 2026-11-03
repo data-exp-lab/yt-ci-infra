@@ -171,6 +171,7 @@ confirm they come back mounted.
 ssh yt-controller
 sudo useradd --system --create-home yt-controller
 sudo git clone https://github.com/yt-project/yt-ci-infra /opt/yt-ci-infra
+sudo chown -R yt-controller: /opt/yt-ci-infra
 sudo ln -s /opt/yt-ci-infra/controller /opt/yt-controller
 sudo -u yt-controller bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 cd /opt/yt-controller && sudo -u yt-controller ~yt-controller/.local/bin/uv sync --no-dev
