@@ -6,14 +6,14 @@
 # Re-running this is the "wipe everything" path: new Python prefix, pytest switch, or a
 # regenerate-from-scratch. It never touches the datasets volume.
 #
-# usage: ANSWERS_DEV=/dev/vdc seed-answers-volume.sh format
+# usage: ANSWERS_DEV=/dev/sdb seed-answers-volume.sh format
 set -euo pipefail
 
 ANSWERS_DEV="${ANSWERS_DEV:-}"
 MNT=/mnt/yt-answers
 
 format_volume() {
-    : "${ANSWERS_DEV:?set ANSWERS_DEV, e.g. /dev/vdc}"
+    : "${ANSWERS_DEV:?set ANSWERS_DEV, the 50G device in lsblk, e.g. /dev/sdb}"
     lsblk "$ANSWERS_DEV"
     read -r -p "mkfs.ext4 on $ANSWERS_DEV, destroying all answer stores. type yes: " ok
     [ "$ok" = yes ] || exit 1
@@ -22,8 +22,8 @@ format_volume() {
     mkdir -p "$MNT"
     mount LABEL=yt-answers "$MNT"
     mkdir -p "$MNT/answers"
-    chown -R runner:runner "$MNT"
     echo "empty answers volume ready at $MNT/answers; generate stores with a baseline run"
+    echo "it is root-owned until worker/provision.sh creates the runner user and chowns it"
 }
 
 case "${1:-}" in

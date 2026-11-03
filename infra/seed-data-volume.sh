@@ -2,7 +2,7 @@
 # Format and populate the datasets volume (`yt-data`). Run as root on the worker, once, with the
 # volume attached. After seeding it is only ever mounted read-only; see worker/boot-runner.sh.
 #
-# usage: DATA_DEV=/dev/vdb seed-data-volume.sh format    # mkfs + label (destructive)
+# usage: DATA_DEV=/dev/sdc seed-data-volume.sh format    # mkfs + label (destructive)
 #        seed-data-volume.sh fetch datasets.json          # download+unpack every entry not yet seeded
 #        seed-data-volume.sh verify datasets.json         # every entry seeded and its paths present
 #
@@ -27,7 +27,7 @@ MARK="$MNT/.seeded"
 TMP="$MNT/.tmp"
 
 format_volume() {
-    : "${DATA_DEV:?set DATA_DEV, e.g. /dev/vdb}"
+    : "${DATA_DEV:?set DATA_DEV, the 200G device in lsblk, e.g. /dev/sdc}"
     lsblk "$DATA_DEV"
     read -r -p "mkfs.ext4 on $DATA_DEV, destroying contents. type yes: " ok
     [ "$ok" = yes ] || exit 1
@@ -67,8 +67,8 @@ fetch_one() {
     curl -fsSL -o "$tmp" "$url" || { rm -f "$tmp"; return 1; }
     case "$df" in
         *.tar.gz|*.tgz)
-            tar -tzf "$tmp" | cut -d/ -f1 | sort -u | sed "s|^|$prefix|" >"$MARK/$df.tmp" || return 1
-            tar -xzf "$tmp" -C "$dir" || return 1
+            tar --warning=no-unknown-keyword -tzf "$tmp" | cut -d/ -f1 | sort -u | sed "s|^|$prefix|" >"$MARK/$df.tmp" || return 1
+            tar --warning=no-unknown-keyword -xzf "$tmp" -C "$dir" || return 1
             rm -f "$tmp"
             ;;
         *.gz)

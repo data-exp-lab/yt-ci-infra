@@ -72,8 +72,9 @@ for seeing volume attachments.
    network, security group `yt-worker-sg` only (remove `default`), same key pair.
    **Do not associate a floating IP.** Note its private address.
 7. **Attach volumes.** Volumes → Volumes → Actions on `yt-data` → Manage Attachments → select
-   `yt-worker` → Attach. Same for `yt-answers`. Horizon shows the device each landed on
-   (typically `/dev/vdb` and `/dev/vdc`); you need these for step 2.
+   `yt-worker` → Attach. Same for `yt-answers`. On the worker they show up as `/dev/sd*`
+   devices, and which letter each volume gets depends on attach order, so identify them by
+   size in step 2 rather than trusting the names here.
 
 ### 1B. Script
 
@@ -124,16 +125,17 @@ reports failures at the end and can be re-run to pick up only what is missing.
 ```
 scp infra/seed-data-volume.sh infra/seed-answers-volume.sh infra/datasets.json yt-worker:
 ssh yt-worker
-sudo lsblk                                            # identify the 200G and 50G devices
-sudo DATA_DEV=/dev/vdb ./seed-data-volume.sh format
+sudo lsblk                                            # 200G is yt-data, 50G is yt-answers
+sudo DATA_DEV=/dev/sdc ./seed-data-volume.sh format     # the 200G device
 sudo ./seed-data-volume.sh fetch datasets.json
 sudo ./seed-data-volume.sh verify datasets.json
-sudo ANSWERS_DEV=/dev/vdc ./seed-answers-volume.sh format
+sudo ANSWERS_DEV=/dev/sdb ./seed-answers-volume.sh format  # the 50G device
 ```
 
-The answers script only formats the volume and leaves an empty `answers/` directory. The
-stores themselves come from the first baseline run of the suite (`operations.md`, "Baseline /
-store runs"); they cannot be seeded from outside the worker.
+The answers script only formats the volume and leaves an empty `answers/` directory, root-owned
+until `provision.sh` (section 3) creates the runner user and chowns it. The stores themselves
+come from the first baseline run of the suite (`operations.md`, "Baseline / store runs"); they
+cannot be seeded from outside the worker.
 
 Budget: the dataset pull is the slow part; do it before provisioning so a provisioning mistake
 does not cost a re-download. The volumes persist independently of the worker.
@@ -147,7 +149,11 @@ sudo CONTROLLER_URL=http://<controller private ip>:8080 ./worker/provision.sh
 ```
 
 Installs the Actions runner, `uv`, Python 3.10, mount points, `/etc/yt-runner/env`, and the
-`yt-runner.service` unit. Then shelve it: Horizon → Compute → Instances → Actions → Shelve
+`yt-runner.service` unit, and chowns the answers volume to the runner user. The apt output
+includes harmless noise: `Ign` lines for the image's local `/software/pkgrep` repo, and a run of
+`Unable to locate package libssl1.1` / `libicuNN` from the runner's `installdependencies.sh`
+probing for older library versions before settling on the ones noble has. The script is safe to
+re-run if it stops partway. Then shelve it: Horizon → Compute → Instances → Actions → Shelve
 Instance (or the Shelve button in Exosphere), or
 
 ```
@@ -163,7 +169,6 @@ confirm they come back mounted.
 
 ```
 ssh yt-controller
-sudo apt-get install -y git
 sudo useradd --system --create-home yt-controller
 sudo git clone https://github.com/yt-project/yt-ci-infra /opt/yt-ci-infra
 sudo ln -s /opt/yt-ci-infra/controller /opt/yt-controller

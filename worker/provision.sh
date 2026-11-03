@@ -30,11 +30,18 @@ install -m 0755 "$(dirname "$0")/boot-runner.sh" "$RUNNER_HOME/boot-runner.sh"
 chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 
 # uv + the pinned interpreter the nose answer job needs (answer stores are py310_* prefixed).
-sudo -u "$RUNNER_USER" bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
-sudo -u "$RUNNER_USER" /home/$RUNNER_USER/.local/bin/uv python install 3.10
+# uv searches the cwd and its parents for uv.toml, so run from a directory the runner can read.
+(cd "/home/$RUNNER_USER" && sudo -u "$RUNNER_USER" bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh')
+(cd "/home/$RUNNER_USER" && sudo -u "$RUNNER_USER" "/home/$RUNNER_USER/.local/bin/uv" python install 3.10)
 
 # Mount points. Volumes are labelled by infra/seed-*-volume.sh; boot-runner.sh mounts by label.
+# The answers volume is written by the runner on baseline runs; the seed script leaves it
+# root-owned because this user does not exist yet when the volumes are seeded.
 mkdir -p /mnt/yt-data /mnt/yt-answers
+if ! mountpoint -q /mnt/yt-answers; then
+    mount LABEL=yt-answers /mnt/yt-answers
+fi
+chown -R "$RUNNER_USER:$RUNNER_USER" /mnt/yt-answers
 
 # Worker-side config: where the controller is, and how to mount the answers volume.
 mkdir -p /etc/yt-runner
