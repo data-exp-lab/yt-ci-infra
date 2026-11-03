@@ -109,7 +109,7 @@ def test_state_survives_corrupt_file(tmp_path):
 
 
 def test_settings_from_env_defaults():
-    s = Settings.from_env({"GITHUB_REPO": "chavlin/yt", "GITHUB_TOKEN": "x"})
+    s = Settings.from_env({"GITHUB_REPO": "chrishavlin/yt", "GITHUB_TOKEN": "x"})
     assert s.worker_name == "yt-worker"
     assert s.grace_seconds == 300
     assert s.idle_shelve_seconds > s.grace_seconds
@@ -117,6 +117,6 @@ def test_settings_from_env_defaults():
 
 def test_settings_from_env_requires_repo_and_token():
     with pytest.raises(ConfigError):
-        Settings.from_env({"GITHUB_REPO": "chavlin/yt"})
+        Settings.from_env({"GITHUB_REPO": "chrishavlin/yt"})
     with pytest.raises(ConfigError):
         Settings.from_env({"GITHUB_REPO": "nope", "GITHUB_TOKEN": "x"})

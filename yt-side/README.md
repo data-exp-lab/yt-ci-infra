@@ -9,7 +9,7 @@ workflows from the repository they run in, so the canonical versions are:
 They are kept here because they are the contract between the yt repo and this
 infrastructure: the runner label, the mount paths, the Python version, the status context.
 When any of those change, change both copies. During v0/v1 the live copies are on the fork
-`chavlin/yt`; see `docs/deploy.md` step 5.
+`chrishavlin/yt`; see `docs/deploy.md` step 5.
 
 ## What the workflow does
 

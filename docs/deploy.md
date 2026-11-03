@@ -2,7 +2,7 @@
 
 Done once per allocation. Afterwards, see `operations.md`.
 
-Development happens against the fork `chavlin/yt`; runners register per repository, so
+Development happens against the fork `chrishavlin/yt`; runners register per repository, so
 `yt-project/yt` sees nothing until the cut-over step at the end.
 
 ## 0. Prerequisites on your laptop
@@ -177,7 +177,14 @@ sudo -u yt-controller bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 cd /opt/yt-controller && sudo -u yt-controller ~yt-controller/.local/bin/uv sync --no-dev
 ```
 
-Secrets:
+Secrets. First, from your laptop, copy the application credential over (it lands as
+`~/clouds.yaml` on the controller):
+
+```
+scp ~/.config/openstack/clouds.yaml yt-controller:
+```
+
+Then on the controller:
 
 ```
 sudo mkdir -p /etc/yt-controller
@@ -192,26 +199,30 @@ sudo chown -R yt-controller: ~yt-controller/.config; sudo chmod 600 ~yt-controll
 GitHub credential for the fork phase: a fine-grained personal access token (PAT: a
 password-like string GitHub issues to your account for API use; "fine-grained" means it is
 limited to named repositories and permissions). Create it at GitHub → Settings → Developer
-settings → Personal access tokens → Fine-grained tokens. Resource owner `chavlin`, repository
-access `chavlin/yt` only, permissions **Administration read/write** and **Actions read**.
+settings → Personal access tokens → Fine-grained tokens. Resource owner `chrishavlin`, repository
+access `chrishavlin/yt` only, permissions **Administration read/write** and **Actions read**.
 Minting just-in-time (JIT) runner configs, the single-use registrations the controller hands
 the worker at boot, is what needs Administration.
 
-Smoke test before enabling anything:
+Smoke test before enabling anything. Actions must already be enabled on the fork (it is
+disabled on forks by default; button on the fork's Actions tab), otherwise every
+`/actions/...` endpoint returns 404 and `status` crashes:
 
 ```
 cd /opt/yt-controller
-sudo -u yt-controller env $(sudo cat /etc/yt-controller/env | xargs) .venv/bin/yt-controller status
+sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller status
 ```
 
 Expect `worker: yt-worker SHELVED_OFFLOADED`, `queued: 0`, `would: none`.
 
-Enable the units:
+Install the units. If you are about to run the v0 checklist (section 6), stop after
+`daemon-reload`: both the reconciler and the idle shelver will shelve the worker under you.
+Enable them at the start of v1.
 
 ```
 sudo cp systemd/*.service systemd/*.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now yt-controller.service yt-controller-idle-shelver.timer
+sudo systemctl enable --now yt-controller.service yt-controller-idle-shelver.timer   # v1
 journalctl -u yt-controller -f
 ```
 
@@ -242,7 +253,7 @@ reporting, with the controller only serving configs. Leave `yt-controller.servic
    or `yt-controller unshelve`. Wait for ACTIVE.
 2. On the controller, watch `journalctl -u yt-controller` (or the `serve` output) for
    `issued runner config`.
-3. `gh api repos/chavlin/yt/actions/runners` shows one runner labelled `jetstream`, `online`.
+3. `gh api repos/chrishavlin/yt/actions/runners` shows one runner labelled `jetstream`, `online`.
 4. Actions tab on the fork: run `answer-tests` via `workflow_dispatch`. Start with a `groups`
    input naming one small group (e.g. `local_art_004`) so the first round trip takes minutes,
    not an hour. `pr` or `ref` pins what to check out.
