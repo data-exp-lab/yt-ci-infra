@@ -122,9 +122,10 @@ https://yt-project.org/data/:
 {"datafile": "grs-50-cube.fits.gz", "unpack_to": "radio_fits", "note": "bare file on the site"}
 ```
 
-`datafile` is the file name on the site. `unpack_to` is a directory under the volume root to
-unpack into, for the few files that are not a tarball of one top-level directory; omitted,
-the file unpacks at the root. `note` is free text. `infra/seed-data-volume.sh` extracts
+`datafile` is the file name, fetched from `https://yt-project.org/data/<datafile>` unless
+`url` gives a full download URL instead, for files that never reached the server. `unpack_to`
+is a directory under the volume root to unpack into, for the few files that are not a tarball
+of one top-level directory; omitted, the file unpacks at the root. `note` is free text. `infra/seed-data-volume.sh` extracts
 tarballs and gunzips anything else, keeping the compressed copy (one FITS test wants the
 `.fits.gz`, another wants the `.fits`). The list is copied to the worker alongside the
 seeding script (`deploy.md` step 2) and is the input to both `fetch` and `verify`.
@@ -153,15 +154,29 @@ check above is the safety net for anything this misses):
    other than their stem, two unpack to a bare file.
 4. Match step 1 against step 3. Each match is an entry. A test name with no match is inside a
    tarball under another name (step 3 shows it), a bare file on the site (write `unpack_to`),
-   or not published at all (nothing to do; those tests skip).
+   or not in the manifest at all. For the last case, search the website repo's pull requests
+   for the name: datasets arrive through a companion PR there, and the file often sits on the
+   server unlisted, or only as an attachment on the PR (write `url`).
 5. `curl -sI` each URL once. The manifest has carried dead links.
 
-Not every test name resolves. Known gaps as of 2026-11-03: `castro_sedov_2d_sph_in_cyl_plt00130`
-and `xrb_spherical_smallplt00010` are on the data page but 404 (kept in the list with a note);
-`no_fields`, `no_particles`, `output_00080_new_halos`, `quokka`, `riot_sedov_curvlinear`,
-`singleParticle` are not on the site; the `amrvac/*.dat` files the tests want are not the
-files in the published amrvac tarballs. All of those tests skip. The fix for each is on the
-yt side, data page or test, not here.
+The manifest is not the server. `yt upload` (use.yt) has returned 500s for years, so files
+reach the server unevenly. The rule for what goes in the list: anything in the manifest, plus
+anything a website PR added that never got copied to the server (`url` entries: the two
+boxlib files attached to PR 129, `riot_sedov_curvlinear` from the author's share on PR 141,
+`quokka` attached to PR 142), plus files that are on the server but were never in the
+manifest (`no_fields`, `no_particles`, `singleParticle`, uploaded for yt PR 1645). Not
+anything a website PR deliberately removed from the manifest, since the old Jenkins runner
+fetched what the manifest listed and removal was a decision.
+
+Known gaps as of 2026-11-03, all tests that skip:
+
+- amrvac. The tests load `amrvac/bw_2d0000.dat` and friends, the layout of the pre-2021
+  tarballs (`amrvac_*.tar.gz`, still on the server). Website PR 97 replaced those manifest
+  entries with per-run tarballs (`bw_polar_2d.tar.gz` and so on, in the list) that unpack to
+  different names and files, and the tests were never updated to match. Deliberately not
+  added; the fix is in the yt tests.
+- `output_00080_new_halos` (AdaptaHOP, website PR 109): its only copy was on use.yt and is
+  gone.
 
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 

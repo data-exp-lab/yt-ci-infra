@@ -49,7 +49,8 @@
  },
  {
   "datafile": "castro_sedov_2d_sph_in_cyl_plt00130.tar.gz",
-  "note": "listed on the data page but HTTP 404 as of 2026-11-03; tests skip until the site is fixed"
+  "url": "https://github.com/user-attachments/files/17320631/castro_sedov_2d_sph_in_cyl_plt00130.tar.gz",
+  "note": "data page link is 404; the file never reached the server, this is the attachment on website PR 129"
  },
  {
   "datafile": "castro_sod_x_plt00036.tar.gz"
@@ -224,6 +225,14 @@
   "note": "unpacks to MOOSE_sample_data"
  },
  {
+  "datafile": "no_fields.tar.gz",
+  "note": "on the server but unlisted: uploaded for yt PR 1645, the data page entry was never added"
+ },
+ {
+  "datafile": "no_particles.tar.gz",
+  "note": "on the server but unlisted: uploaded for yt PR 1645, the data page entry was never added"
+ },
+ {
   "datafile": "Nyx_LyA.tar.gz"
  },
  {
@@ -262,6 +271,11 @@
   "datafile": "PopIII_mini.tar.gz"
  },
  {
+  "datafile": "quokka.tar.gz",
+  "url": "https://github.com/user-attachments/files/34338867/quokka.tar.gz",
+  "note": "not on the data page yet; attachment on website PR 142"
+ },
+ {
   "datafile": "RadAdvect.tar.gz"
  },
  {
@@ -292,6 +306,11 @@
   "datafile": "ramses_star_formation.tar.gz"
  },
  {
+  "datafile": "riot_sedov_curvlinear.tar.gz",
+  "url": "https://cloud.hs.uni-hamburg.de/s/J6NETRRwj8Zifgs/download",
+  "note": "not on the data page yet; author's share linked from website PR 141"
+ },
+ {
   "datafile": "rockstar_halos.tar.gz"
  },
  {
@@ -309,6 +328,10 @@
  },
  {
   "datafile": "ShockCloud.tar.gz"
+ },
+ {
+  "datafile": "singleParticle.tar.gz",
+  "note": "on the server but unlisted: uploaded for yt PR 1645, the data page entry was never added"
  },
  {
   "datafile": "sizmbhloz-clref04SNth-rs9_a0.9011.tar.gz"
@@ -356,7 +379,8 @@
  },
  {
   "datafile": "xrb_spherical_smallplt00010.tar.gz",
-  "note": "listed on the data page but HTTP 404 as of 2026-11-03; tests skip until the site is fixed"
+  "url": "https://github.com/user-attachments/files/17320632/xrb_spherical_smallplt00010.tar.gz",
+  "note": "data page link is 404; the file never reached the server, this is the attachment on website PR 129"
  },
  {
   "datafile": "ytdata_test.tar.gz"

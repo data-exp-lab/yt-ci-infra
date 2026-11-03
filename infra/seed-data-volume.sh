@@ -6,11 +6,12 @@
 #        seed-data-volume.sh fetch datasets.json          # download+unpack every entry not yet seeded
 #        seed-data-volume.sh verify datasets.json         # every entry seeded and its paths present
 #
-# datasets.json is infra/datasets.json in yt-ci-infra: a list of {"datafile", "unpack_to"?, "note"?}.
-# datafile is a file name under https://yt-project.org/data/. Tarballs (.tar.gz, .tgz) are
-# extracted; any other .gz is gunzipped with the compressed copy kept. unpack_to is a directory
-# under the volume root to unpack into; omitted, the entry unpacks at the root. How the list was
-# built: docs/operations.md, "Dataset pre-flight".
+# datasets.json is infra/datasets.json in yt-ci-infra: a list of
+# {"datafile", "unpack_to"?, "url"?, "note"?}. datafile is a file name, fetched from
+# https://yt-project.org/data/<datafile> unless url gives a full download URL instead. Tarballs
+# (.tar.gz, .tgz) are extracted; any other .gz is gunzipped with the compressed copy kept.
+# unpack_to is a directory under the volume root to unpack into; omitted, the entry unpacks at
+# the root. How the list was built: docs/operations.md, "Dataset pre-flight".
 #
 # Each file is downloaded whole to <volume>/.tmp before unpacking, so a failed download leaves
 # nothing half-extracted. A seeded entry leaves <volume>/.seeded/<datafile> listing the top-level
@@ -46,16 +47,18 @@ mount_rw() {
     fi
 }
 
-# Prints one "datafile<TAB>unpack_to" line per entry; unpack_to empty when absent.
+# Prints one "datafile|unpack_to|url" line per entry, '|' standing for the ASCII unit separator;
+# optional fields empty when absent. (A tab would collapse empty fields in `read`.)
+SEP=$'\x1f'
 entries() {
     python3 -c '
 import json, sys
 for e in json.load(open(sys.argv[1])):
-    print(e["datafile"] + "\t" + e.get("unpack_to", ""))' "$1"
+    print(chr(31).join([e["datafile"], e.get("unpack_to", ""), e.get("url", "")]))' "$1"
 }
 
 fetch_one() {
-    local df="$1" dest="$2" url="$BASE_URL/$1" dir="$MNT/${2:-.}" prefix="${2:+$2/}" tmp="$TMP/$1"
+    local df="$1" dest="$2" url="${3:-$BASE_URL/$1}" dir="$MNT/${2:-.}" prefix="${2:+$2/}" tmp="$TMP/$1"
     case "$df" in
         *.gz) ;;
         *) echo "don't know how to unpack $df" >&2; return 1 ;;
@@ -78,21 +81,21 @@ fetch_one() {
 }
 
 fetch_datasets() {
-    local list="$1" df dest failed=()
+    local list="$1" df dest url failed=()
     mount_rw
     mkdir -p "$MARK"
-    while IFS=$'\t' read -r df dest; do
+    while IFS="$SEP" read -r df dest url; do
         if [ -e "$MARK/$df" ]; then echo "have   $df"; continue; fi
-        echo "fetch  $df${dest:+ -> $dest/}"
-        fetch_one "$df" "$dest" || { echo "FAILED $df"; rm -f "$MARK/$df.tmp" "$TMP/$df"; failed+=("$df"); }
+        echo "fetch  $df${dest:+ -> $dest/}${url:+ from $url}"
+        fetch_one "$df" "$dest" "$url" || { echo "FAILED $df"; rm -f "$MARK/$df.tmp" "$TMP/$df"; failed+=("$df"); }
     done < <(entries "$list")
     echo "${#failed[@]} failed${failed[*]:+: ${failed[*]}}"
     [ "${#failed[@]}" -eq 0 ]
 }
 
 verify_datasets() {
-    local list="$1" df dest p bad=0
-    while IFS=$'\t' read -r df dest; do
+    local list="$1" df dest url p bad=0
+    while IFS="$SEP" read -r df dest url; do
         if [ ! -e "$MARK/$df" ]; then echo "MISSING $df (never seeded)"; bad=$((bad + 1)); continue; fi
         while read -r p; do
             [ -e "$MNT/$p" ] || { echo "MISSING $df: $p"; bad=$((bad + 1)); }
