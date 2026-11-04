@@ -85,7 +85,8 @@ by mistake is undone by deleting its directory on the worker; the next run regen
 
 **Baseline** (empty volume, or a new Python prefix): dispatch with `groups` blank from a trusted
 ref. Every group stores and compares. Groups with missing datasets fail and leave nothing behind;
-fix the data and dispatch those groups again.
+fix the data and dispatch those groups again. If the trusted ref predates the harness files,
+dispatch cannot check it out as-is; see "Manual baseline run" below.
 
 **Snapshot** the volume after the baseline and after each bump, so a bad store or a broken PR
 with write access can be rolled back without regenerating everything:
@@ -98,6 +99,88 @@ openstack volume snapshot create --volume yt-answers --force yt-answers-$(date +
 once a later one exists.
 
 Shelve files are dbm-backend dependent: generate stores on the worker, never copy from a laptop.
+
+## Manual baseline run (outside the workflow)
+
+Use this when the trusted ref predates the harness, which is the case for the first baseline:
+the last known good commit is `66af53cedb7af599faf3c2471bcd380d961e37a6` (merge of PR #5143,
+2025-03-24, the final green Jenkins build), and at that SHA `tests/ci_install.sh` is the pip-era
+script, `pyproject.toml` has no `nosetest` dependency group, and `tests/nose_runner.py` detects
+stores by directory (never matches a shelve file) and always exits 0. Dispatching `ref=66af53c`
+checks out all of that and fails at the install step. Running by hand on the worker sidesteps
+the dispatch requirements too (workflow file on the dispatch branch, SHA reachable from
+yt-project/yt): only the store files matter, and they are the same files either way.
+
+**1. Build the branch (laptop).** yt's code at the trusted ref, the harness files on top:
+
+```
+git checkout -b baseline-66af53c 66af53cedb7af599faf3c2471bcd380d961e37a6
+git checkout <harness-branch> -- tests/nose_runner.py tests/ci_install.sh tests/tests.yaml
+```
+
+Then add the `nosetest` block under `[dependency-groups]` in `pyproject.toml` by hand (copy the
+seven lines from the harness branch; `[dependency-groups]` itself does not exist at this SHA
+either). Do not take the whole `pyproject.toml` or `uv.lock`: those carry every dependency change
+since the ref. Commit and push the branch to your fork. The two extra `tests.yaml` lines are
+`--ignore-file` entries for the unittests job; harmless if the files do not exist.
+
+**2. Keep the worker up, and alone.** On the controller:
+
+```
+sudo systemctl stop yt-controller-idle-shelver.timer yt-controller
+yt-controller unshelve
+```
+
+Both shelvers decide "idle" from GitHub (queued jobs, runner busy), so a run outside the runner
+looks idle and the VM is shelved under it after `IDLE_SHELVE_SECONDS`. On the worker, once it is
+up:
+
+```
+sudo systemctl stop yt-runner
+mountpoint /mnt/yt-data && mountpoint /mnt/yt-answers && ls -ld /mnt/yt-answers/answers
+```
+
+Stopping the runner guarantees no dispatched job writes stores at the same time. The mounts are
+made by the service's `ExecStartPre` and survive stopping it; the answers directory must be
+owned by `runner`.
+
+**3. Run as `runner`, in tmux.** Store files are owned by whoever writes them and the dbm format
+is the interpreter's, so this has to be the runner user with its own uv and Python 3.10, not
+`ubuntu`:
+
+```
+sudo -iu runner
+tmux new -s baseline
+. /etc/yt-runner/env
+export PATH="$HOME/.local/bin:$PATH" MPLCONFIGDIR=tests
+git clone --recurse-submodules --branch baseline-66af53c https://github.com/<fork>/yt ~/baseline
+cd ~/baseline
+sync_args="--extra=full --group=nosetest" UV_PYTHON=3.10 YT_CI_SKIP_SYSTEM_DEPS=1 source tests/ci_install.sh
+find .venv/lib/python3.10/site-packages/nose -name '*.py' -exec sed -i -e 's/collections.Callable/collections.abc.Callable/g' '{}' ';'
+uv run --no-sync yt config set --local yt test_data_dir "$YT_TEST_DATA_DIR"
+export NUM_WORKERS=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
+uv run --no-sync python tests/nose_runner.py --no-unittests 2>&1 | tee ~/baseline-$(date +%F).log
+```
+
+This is the workflow's job, step for step, minus the xunit upload and commit status.
+`--no-unittests` skips the `other_tests` job, which writes no stores; drop the flag to also get
+a unittest result for the ref. Every group runs twice (store, then compare), so expect the run
+to take about twice as long as a normal compare run. Detach with `Ctrl-b` then `d`.
+
+**4. Check, snapshot, restore.** The log ends with `STORED new answers (N): ...` and either
+`all nose runs passed` or `FAILED (N): ...`. For each failed group, look for the missing-dataset
+skips (the grep in "Dataset pre-flight"); a group that failed left nothing behind, so after
+fixing the data rerun just those groups with `--groups a,b` from the same shell. Then:
+
+```
+ls /mnt/yt-answers/answers            # one py310_<group> directory per answer_tests key, owned by runner
+openstack volume snapshot create --volume yt-answers --force yt-answers-$(date +%F)
+```
+
+Restore the services (controller: `systemctl start yt-controller yt-controller-idle-shelver.timer`;
+worker: `systemctl start yt-runner`, or just `yt-controller shelve`, which the next unshelve boots
+clean). The clone under `~runner/baseline` can be deleted; the `.venv` in it is not reused by
+jobs.
 
 ## Change the Python version the suite runs on
 
