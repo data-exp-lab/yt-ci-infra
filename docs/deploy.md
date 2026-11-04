@@ -159,8 +159,7 @@ Installs the Actions runner, `uv`, Python 3.10, mount points, `/etc/yt-runner/en
 includes harmless noise: `Ign` lines for the image's local `/software/pkgrep` repo, and a run of
 `Unable to locate package libssl1.1` / `libicuNN` from the runner's `installdependencies.sh`
 probing for older library versions before settling on the ones noble has. The script is safe to
-re-run if it stops partway. On a re-run after the unit is enabled, `yt-runner.service` has already
-mounted the volumes at boot; the script remounts the answers volume read-write for its chown.
+re-run if it stops partway.
 Then shelve it: Horizon → Compute → Instances → Actions → Shelve
 Instance (or the Shelve button in Exosphere), or
 
@@ -262,9 +261,8 @@ Validates the worker image, volume mounts, JIT handoff, ephemeral runner, the su
 reporting, with the controller only serving configs. Leave `yt-controller.service` stopped and run
 `yt-controller serve` in a tmux instead, so nothing shelves the worker under you.
 
-0. No answer stores exist yet, so the first run of every group is a store run and needs the
-   answers volume writable: set `ANSWERS_MODE=rw` in `/etc/yt-runner/env` on the worker
-   (`operations.md`, "Baseline / store runs"). Set it back to `ro` before the first PR run.
+0. No answer stores exist yet, so the first run of every group is a store run followed by a
+   compare run (`operations.md`, "Answer stores"). Nothing to configure for that.
 1. On the controller, start the config endpoint in a tmux session so it outlives your ssh login:
 
    ```

@@ -48,10 +48,8 @@ chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 (cd "/home/$RUNNER_USER" && sudo -u "$RUNNER_USER" "/home/$RUNNER_USER/.local/bin/uv" python install 3.10)
 
 # Mount points. Volumes are labelled by infra/seed-*-volume.sh; boot-runner.sh mounts by label.
-# The answers volume is written by the runner on baseline runs; the seed script leaves it
-# root-owned because this user does not exist yet when the volumes are seeded.
-# If yt-runner.service already ran at this boot it mounted the answers volume read-only;
-# remount rw for the chown. The next boot-runner.sh mount re-applies ANSWERS_MODE.
+# The answers volume is written by the runner whenever a group has no store yet; the seed
+# script leaves it root-owned because this user does not exist yet when the volumes are seeded.
 mkdir -p "$YT_TEST_DATA_DIR" "$YT_ANSWERS_DIR"
 if mountpoint -q "$YT_ANSWERS_DIR"; then
     mount -o remount,rw "$YT_ANSWERS_DIR"
@@ -60,14 +58,12 @@ else
 fi
 chown -R "$RUNNER_USER:$RUNNER_USER" "$YT_ANSWERS_DIR"
 
-# Worker-side config: where the controller is, where the volumes mount, how to mount answers.
+# Worker-side config: where the controller is, where the volumes mount.
 mkdir -p /etc/yt-runner
 cat > /etc/yt-runner/env <<ENV
 CONTROLLER_URL=${CONTROLLER_URL}
 YT_TEST_DATA_DIR=${YT_TEST_DATA_DIR}
 YT_ANSWERS_DIR=${YT_ANSWERS_DIR}
-# ro for PR compare runs (default). rw only for baseline/store runs; see docs/operations.md.
-ANSWERS_MODE=ro
 ENV
 chmod 0644 /etc/yt-runner/env
 

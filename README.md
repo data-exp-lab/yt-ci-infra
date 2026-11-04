@@ -31,7 +31,7 @@ a machine and hand it a runner config.
                                        │                       │ datasets:    ││
                                        │                       │  read-only   ││
                                        │                       │ answers:     ││
-                                       │                       │  ro / rw     ││
+                                       │                       │  read-write  ││
                                        │                       └──────────────┘│
                                        └──────────────────────────────────────┘
 ```

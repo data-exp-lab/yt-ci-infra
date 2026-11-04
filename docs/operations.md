@@ -12,10 +12,10 @@ For first-time setup see `deploy.md`.
 | controller state | `/var/lib/yt-controller/state.json` (last-activity timestamp; safe to delete) |
 | controller logs | `journalctl -u yt-controller`, `journalctl -u yt-controller-idle-shelver` |
 | worker runner | `/opt/yt-runner`, job workspaces under `_work/`, diagnostics under `_diag/` |
-| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `YT_TEST_DATA_DIR`, `YT_ANSWERS_DIR`, `ANSWERS_MODE`). The two mount paths are the single source: `boot-runner.sh` mounts there and exports `YT_TEST_DATA_DIR` into the runner's environment, which every job inherits. |
+| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `YT_TEST_DATA_DIR`, `YT_ANSWERS_DIR`). The two mount paths are the single source: `boot-runner.sh` mounts there and exports `YT_TEST_DATA_DIR` into the runner's environment, which every job inherits. |
 | worker logs | `journalctl -u yt-runner` |
 | datasets | `/mnt/yt-data` on the worker, volume `yt-data`, always read-only |
-| answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |
+| answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`, always read-write; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |
 | yt-side files | `yt-side/` here; canonical copies in the yt repo |
 
 ## Is it healthy?
@@ -59,24 +59,45 @@ runner configs.
 3. `systemctl restart yt-controller`; `yt-controller status` must show the worker.
 4. Delete the old credential in Horizon.
 
-## Baseline / store runs: answers volume read-write
+## Answer stores: baselines and bumps
 
-PR compare runs mount `/mnt/yt-answers` read-only so untrusted code can never write a baseline;
-a missing store then fails loudly rather than being generated. To generate a baseline from a
-trusted ref:
+The answers volume is always mounted read-write. There is no read-only mode: yt's answer plugin
+opens a store with `shelve.open` in its default create mode, which needs write access even to
+compare (gdbm refuses to open an existing file read-write on a read-only filesystem). The guard
+against untrusted code writing a baseline is the `authorize` job in the workflow, which only lets
+maintainers dispatch, the same trust the Jenkins box ran on.
 
-1. On the worker (unshelve it, SSH via ProxyJump): set `ANSWERS_MODE=rw` in `/etc/yt-runner/env`.
-2. Dispatch the workflow with the trusted ref.
-3. Set `ANSWERS_MODE=ro` back **before** the next PR run. This is a manual guard for v1; TODO:
-   drive the mode from the job (the controller could pass it with the runner config).
+What a run does with stores, per group (`yt-side/nose_runner.py`):
+
+- Store exists (`<answers>/<py3XX_group>/<py3XX_group>*`): compare against it. Nothing is written.
+- No store: run the group once with `--answer-store`, then compare. The log and the job summary
+  end with `STORED new answers (N): ...` naming every group this run generated.
+- Store pass fails, or writes no file (yt skips the dump when a dataset is missing): the group
+  fails and its directory is removed, so the next run tries again instead of comparing against
+  an empty or partial store forever. The compare pass is not run.
+
+**Bumping answers** is the yt convention: increment the group's suffix in `tests/tests.yaml`
+(`local_art_004` to `local_art_005`) in the PR that changes the answers. The new name has no
+store, so the first maintainer dispatch on that PR generates it from the PR's code and the
+compare pass is trivially green. Review the diff before dispatching; that is the approval step.
+The old store stays on the volume, so reverting the bump reverts the baseline. A store generated
+by mistake is undone by deleting its directory on the worker; the next run regenerates it.
+
+**Baseline** (empty volume, or a new Python prefix): dispatch with `groups` blank from a trusted
+ref. Every group stores and compares. Groups with missing datasets fail and leave nothing behind;
+fix the data and dispatch those groups again.
+
+**Snapshot** the volume after the baseline and after each bump, so a bad store or a broken PR
+with write access can be rolled back without regenerating everything:
+
+```
+openstack volume snapshot create --volume yt-answers --force yt-answers-$(date +%F)
+```
+
+`--force` because the volume is attached to the (shelved) worker. Old snapshots can be deleted
+once a later one exists.
 
 Shelve files are dbm-backend dependent: generate stores on the worker, never copy from a laptop.
-
-A store run that fails partway (missing dataset permissions, a crash in the first test) leaves
-`<answers>/<py3XX_group>/` behind empty; yt's plugin creates the directory before any test runs.
-Upstream `nose_runner.py` keyed "store or compare" on that directory existing, so every later run
-would compare against nothing (`YTNoOldAnswer` on every test). The runner in `yt-side/` tests
-for the shelve file instead. On an older runner, `rm -rf` the empty directory and dispatch again.
 
 ## Change the Python version the suite runs on
 
@@ -101,15 +122,13 @@ The version is wired in three places, plus one consequence on the answers volume
 That last row is the real cost. The procedure:
 
 1. Pick a trusted ref (a green run on the current version, or the last-known-good commit).
-2. Set `ANSWERS_MODE=rw` on the worker (see "Baseline / store runs" above).
-3. Dispatch with `ref=<trusted>` and the new `PYTHON_VERSION`: a one-line change to the job
+2. Dispatch with `ref=<trusted>` and the new `PYTHON_VERSION`: a one-line change to the job
    env in `.github/workflows/answer-tests.yml` on the ref you dispatch from. Every group generates under the
-   new prefix; compare pass runs against its own output and should be green.
-4. Set `ANSWERS_MODE=ro` back.
-5. Dispatch `main` on the new version with answers read-only. Differences here are interpreter or
+   new prefix; compare pass runs against its own output and should be green. Snapshot the volume.
+3. Dispatch `main` on the new version. Differences here are interpreter or
    dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
    before merging the version bump into the yt repo.
-6. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
+4. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
    them once nobody needs to compare against the old version (or wipe the whole volume with
    `infra/seed-answers-volume.sh format` and regenerate; it never touches the datasets).
 
@@ -234,7 +253,7 @@ If a systemd unit changed: copy it to `/etc/systemd/system/` and `systemctl daem
 
 The worker has its own checkout at `/opt/yt-ci-infra`, owned by the login user. `provision.sh`
 is safe to re-run and is the simplest way to install a changed `boot-runner.sh`, unit file, or
-`/etc/yt-runner/env` (it rewrites that file, so `ANSWERS_MODE` goes back to `ro`):
+`/etc/yt-runner/env` (it rewrites that file):
 
 ```
 cd /opt/yt-ci-infra && git pull
