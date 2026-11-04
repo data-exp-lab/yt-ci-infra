@@ -159,7 +159,9 @@ Installs the Actions runner, `uv`, Python 3.10, mount points, `/etc/yt-runner/en
 includes harmless noise: `Ign` lines for the image's local `/software/pkgrep` repo, and a run of
 `Unable to locate package libssl1.1` / `libicuNN` from the runner's `installdependencies.sh`
 probing for older library versions before settling on the ones noble has. The script is safe to
-re-run if it stops partway. Then shelve it: Horizon → Compute → Instances → Actions → Shelve
+re-run if it stops partway. On a re-run after the unit is enabled, `yt-runner.service` has already
+mounted the volumes at boot; the script remounts the answers volume read-write for its chown.
+Then shelve it: Horizon → Compute → Instances → Actions → Shelve
 Instance (or the Shelve button in Exosphere), or
 
 ```

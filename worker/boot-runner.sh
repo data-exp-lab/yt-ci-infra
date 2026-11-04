@@ -14,9 +14,19 @@ ENV_FILE=/etc/yt-runner/env
 : "${YT_ANSWERS_DIR:?YT_ANSWERS_DIR not set in $ENV_FILE}"
 : "${ANSWERS_MODE:=ro}"
 
+# Remount if already mounted so the mode in /etc/yt-runner/env always wins, including after a
+# provision.sh run or a manual mount earlier in the same boot.
 mount_volumes() {
-    mountpoint -q "$YT_TEST_DATA_DIR" || mount -o ro,noatime LABEL=yt-data "$YT_TEST_DATA_DIR"
-    mountpoint -q "$YT_ANSWERS_DIR"   || mount -o "${ANSWERS_MODE},noatime" LABEL=yt-answers "$YT_ANSWERS_DIR"
+    if mountpoint -q "$YT_TEST_DATA_DIR"; then
+        mount -o remount,ro,noatime "$YT_TEST_DATA_DIR"
+    else
+        mount -o ro,noatime LABEL=yt-data "$YT_TEST_DATA_DIR"
+    fi
+    if mountpoint -q "$YT_ANSWERS_DIR"; then
+        mount -o "remount,${ANSWERS_MODE},noatime" "$YT_ANSWERS_DIR"
+    else
+        mount -o "${ANSWERS_MODE},noatime" LABEL=yt-answers "$YT_ANSWERS_DIR"
+    fi
     echo "mounted: yt-data ro at $YT_TEST_DATA_DIR, yt-answers ${ANSWERS_MODE} at $YT_ANSWERS_DIR"
 }
 

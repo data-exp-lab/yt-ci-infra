@@ -50,9 +50,13 @@ chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 # Mount points. Volumes are labelled by infra/seed-*-volume.sh; boot-runner.sh mounts by label.
 # The answers volume is written by the runner on baseline runs; the seed script leaves it
 # root-owned because this user does not exist yet when the volumes are seeded.
+# If yt-runner.service already ran at this boot it mounted the answers volume read-only;
+# remount rw for the chown. The next boot-runner.sh mount re-applies ANSWERS_MODE.
 mkdir -p "$YT_TEST_DATA_DIR" "$YT_ANSWERS_DIR"
-if ! mountpoint -q "$YT_ANSWERS_DIR"; then
-    mount LABEL=yt-answers "$YT_ANSWERS_DIR"
+if mountpoint -q "$YT_ANSWERS_DIR"; then
+    mount -o remount,rw "$YT_ANSWERS_DIR"
+else
+    mount -o rw LABEL=yt-answers "$YT_ANSWERS_DIR"
 fi
 chown -R "$RUNNER_USER:$RUNNER_USER" "$YT_ANSWERS_DIR"
 
