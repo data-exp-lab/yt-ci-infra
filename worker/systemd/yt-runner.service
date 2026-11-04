@@ -17,7 +17,10 @@ ExecStart=/opt/yt-runner/boot-runner.sh run
 # A failed start (no config obtainable) stays down until the next unshelve.
 Restart=on-success
 RestartSec=15
-KillMode=process
+# SIGINT must reach Runner.Listener itself (it deregisters and exits on Ctrl-C). The default
+# control-group kill mode signals every process in the unit; KillMode=process would hit only
+# the run.sh wrapper, which defers the signal while waiting on the listener, and would leave
+# the listener orphaned after the stop timeout.
 KillSignal=SIGINT
 TimeoutStopSec=5min
 
