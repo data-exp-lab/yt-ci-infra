@@ -77,6 +77,9 @@ fetch_one() {
             printf '%s\n' "$prefix$df" "$prefix${df%.gz}" >"$MARK/$df.tmp"
             ;;
     esac
+    # tar as root keeps the archive's modes, and laptop-made tarballs carry 700 directories
+    # that the runner user cannot enter. Open everything this entry produced for reading.
+    while IFS= read -r path; do chmod -R a+rX "$MNT/$path"; done <"$MARK/$df.tmp"
     mv "$MARK/$df.tmp" "$MARK/$df"
 }
 

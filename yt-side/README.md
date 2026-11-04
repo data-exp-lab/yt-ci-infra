@@ -66,6 +66,13 @@ still excludes every answer test from the full file, not just the selected group
 `nose.run` result is collected and the script exits 1 naming the failed runs, so the workflow
 step fails without parsing xunit XML. (Upstream always exits 0.)
 
+The install step passes `--reinstall-package yt`. yt's editable install compiles its Cython
+extensions in place in the source tree; on a self-hosted runner the work directory persists
+between jobs, checkout's clean removes those `.so` files, and uv reuses its cached build
+without recompiling (`ModuleNotFoundError: yt.geometry.selection_routines` on the second run).
+Forcing the rebuild costs a Cython compile per job and is also what makes a `.pyx` change in a
+PR take effect.
+
 **`tests/ci_install.sh`** skips its `sudo apt-get` step when `YT_CI_SKIP_SYSTEM_DEPS=1`. The
 worker has `libfuse2` from `worker/provision.sh` and the runner user has no sudo. The variable
 is unset in every existing workflow, so GitHub-hosted jobs are unchanged.

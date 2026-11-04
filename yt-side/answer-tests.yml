@@ -103,10 +103,12 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      # --reinstall-package yt: the editable build compiles the Cython extensions in place, and
+      # checkout's clean removes them between jobs while uv's cached build still looks valid.
       - name: Install dependencies and yt
         shell: bash
         env:
-          sync_args: --extra=full --group=nosetest
+          sync_args: --extra=full --group=nosetest --reinstall-package yt
           UV_PYTHON: ${{ env.PYTHON_VERSION }}
           YT_CI_SKIP_SYSTEM_DEPS: "1"   # libfuse2 is provisioned on the worker; runner has no sudo
         run: source ./tests/ci_install.sh

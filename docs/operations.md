@@ -178,6 +178,16 @@ Known gaps as of 2026-11-03, all tests that skip:
 - `output_00080_new_halos` (AdaptaHOP, website PR 109): its only copy was on use.yt and is
   gone.
 
+**Permissions.** Everything on the volume must be world-readable and directories world-
+searchable (`a+rX`): the runner user reads it, root seeded it, and tarball modes are preserved
+by root's `tar`. The seed script applies `chmod -R a+rX` per entry; a volume seeded before that
+was added, or anything copied on by hand, needs it run once over the whole mount with the
+volume remounted read-write:
+
+```
+sudo mount -o remount,rw /mnt/yt-data && sudo chmod -R a+rX /mnt/yt-data && sudo mount -o remount,ro /mnt/yt-data
+```
+
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 
 ```
