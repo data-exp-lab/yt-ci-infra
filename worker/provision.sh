@@ -8,6 +8,10 @@ RUNNER_VERSION="${RUNNER_VERSION:-2.321.0}"   # TODO: bump to current before fir
 RUNNER_USER=runner
 RUNNER_HOME=/opt/yt-runner
 CONTROLLER_URL="${CONTROLLER_URL:?set CONTROLLER_URL=http://<controller-private-ip>:8080}"
+# Mount points. Written to /etc/yt-runner/env below, which is the single source for
+# boot-runner.sh and (via the runner's .env file) for the answer-tests workflow.
+YT_TEST_DATA_DIR=/mnt/yt-data
+YT_ANSWERS_DIR=/mnt/yt-answers
 
 apt-get update
 apt-get install -y --no-install-recommends \
@@ -37,16 +41,18 @@ chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_HOME"
 # Mount points. Volumes are labelled by infra/seed-*-volume.sh; boot-runner.sh mounts by label.
 # The answers volume is written by the runner on baseline runs; the seed script leaves it
 # root-owned because this user does not exist yet when the volumes are seeded.
-mkdir -p /mnt/yt-data /mnt/yt-answers
-if ! mountpoint -q /mnt/yt-answers; then
-    mount LABEL=yt-answers /mnt/yt-answers
+mkdir -p "$YT_TEST_DATA_DIR" "$YT_ANSWERS_DIR"
+if ! mountpoint -q "$YT_ANSWERS_DIR"; then
+    mount LABEL=yt-answers "$YT_ANSWERS_DIR"
 fi
-chown -R "$RUNNER_USER:$RUNNER_USER" /mnt/yt-answers
+chown -R "$RUNNER_USER:$RUNNER_USER" "$YT_ANSWERS_DIR"
 
-# Worker-side config: where the controller is, and how to mount the answers volume.
+# Worker-side config: where the controller is, where the volumes mount, how to mount answers.
 mkdir -p /etc/yt-runner
 cat > /etc/yt-runner/env <<ENV
 CONTROLLER_URL=${CONTROLLER_URL}
+YT_TEST_DATA_DIR=${YT_TEST_DATA_DIR}
+YT_ANSWERS_DIR=${YT_ANSWERS_DIR}
 # ro for PR compare runs (default). rw only for baseline/store runs; see docs/operations.md.
 ANSWERS_MODE=ro
 ENV

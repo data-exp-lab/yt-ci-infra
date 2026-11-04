@@ -10,16 +10,27 @@ ENV_FILE=/etc/yt-runner/env
 # shellcheck source=/dev/null
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 : "${CONTROLLER_URL:?CONTROLLER_URL not set in $ENV_FILE}"
+: "${YT_TEST_DATA_DIR:?YT_TEST_DATA_DIR not set in $ENV_FILE}"
+: "${YT_ANSWERS_DIR:?YT_ANSWERS_DIR not set in $ENV_FILE}"
 : "${ANSWERS_MODE:=ro}"
 
 mount_volumes() {
-    mountpoint -q /mnt/yt-data    || mount -o ro,noatime LABEL=yt-data /mnt/yt-data
-    mountpoint -q /mnt/yt-answers || mount -o "${ANSWERS_MODE},noatime" LABEL=yt-answers /mnt/yt-answers
-    echo "mounted: yt-data ro, yt-answers ${ANSWERS_MODE}"
+    mountpoint -q "$YT_TEST_DATA_DIR" || mount -o ro,noatime LABEL=yt-data "$YT_TEST_DATA_DIR"
+    mountpoint -q "$YT_ANSWERS_DIR"   || mount -o "${ANSWERS_MODE},noatime" LABEL=yt-answers "$YT_ANSWERS_DIR"
+    echo "mounted: yt-data ro at $YT_TEST_DATA_DIR, yt-answers ${ANSWERS_MODE} at $YT_ANSWERS_DIR"
+}
+
+# The runner exports every line of its .env file into each job's environment and takes the
+# job PATH from .path. This is how the workflow learns the data mount and finds uv without
+# either path appearing in the yt repo.
+write_job_env() {
+    printf 'YT_TEST_DATA_DIR=%s\n' "$YT_TEST_DATA_DIR" > "$RUNNER_HOME/.env"
+    printf '%s\n' "$HOME/.local/bin:$PATH" > "$RUNNER_HOME/.path"
 }
 
 run_one_job() {
     cd "$RUNNER_HOME"
+    write_job_env
     local cfg
     # Controller may still be settling or the private network may lag the boot; retry briefly.
     for attempt in $(seq 1 12); do

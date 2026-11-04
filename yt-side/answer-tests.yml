@@ -50,7 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.issue.number || inputs.pr }}
           REF: ${{ inputs.ref }}
-          GROUPS: ${{ inputs.groups }}
+          ANSWER_GROUPS: ${{ inputs.groups }}
         run: |
           if [ -n "$PR" ]; then
             sha=$(gh api "repos/${{ github.repository }}/pulls/${PR}" --jq .head.sha)
@@ -59,9 +59,9 @@ jobs:
           else
             sha="${{ github.sha }}"
           fi
-          echo "testing ${sha} (pr='${PR}' ref='${REF}' groups='${GROUPS}')"
+          echo "testing ${sha} (pr='${PR}' ref='${REF}' groups='${ANSWER_GROUPS}')"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
-          echo "groups=${GROUPS}" >> "$GITHUB_OUTPUT"
+          echo "groups=${ANSWER_GROUPS}" >> "$GITHUB_OUTPUT"
 
       - name: Acknowledge the comment
         if: github.event_name == 'issue_comment'
@@ -75,6 +75,11 @@ jobs:
     needs: authorize
     runs-on: [self-hosted, jetstream]
     timeout-minutes: 240
+    env:
+      # Answer stores on the worker are py310_* prefixed; bump here and regenerate them
+      # together (see yt-ci-infra docs/operations.md, "Bumping the Python version").
+      PYTHON_VERSION: "3.10"
+      MPLCONFIGDIR: tests
     steps:
       - name: Mark pending on the commit
         env:
@@ -90,11 +95,32 @@ jobs:
           submodules: true
           persist-credentials: false
 
+      - name: Install dependencies and yt
+        shell: bash
+        env:
+          sync_args: --extra=full --group=nosetest
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
+          YT_CI_SKIP_SYSTEM_DEPS: "1"   # libfuse2 is provisioned on the worker; runner has no sudo
+        run: source ./tests/ci_install.sh
+
+      - name: Patch nosetest
+        # same as build-test.yaml: nose is unmaintained and still references collections.Callable
+        run: |
+          find .venv/lib/python${PYTHON_VERSION}/site-packages/nose -name '*.py' \
+            -exec sed -i -e 's/collections.Callable/collections.abc.Callable/g' '{}' ';'
+
+      # YT_TEST_DATA_DIR (the dataset mount) and uv's PATH entry come from the worker's runner
+      # .env/.path files, written by boot-runner.sh from /etc/yt-runner/env. Nothing here knows
+      # where the data lives; the config-set line fails loudly on a runner that is not ours.
       - name: Run answer tests
         env:
-          GROUPS: ${{ needs.authorize.outputs.groups }}
-          YT_TEST_DATA_DIR: /mnt/yt-data
-        run: bash tests/run_answer_tests.sh
+          YT_TEST_GROUPS: ${{ needs.authorize.outputs.groups }}
+        run: |
+          uv run --no-sync yt config set --local yt test_data_dir "${YT_TEST_DATA_DIR:?not exported by the runner}"
+          rm -f ./*.xml
+          export NUM_WORKERS=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
+          echo "NUM_WORKERS=$NUM_WORKERS groups='${YT_TEST_GROUPS}'"
+          uv run --no-sync python tests/nose_runner.py
 
       - name: Upload xunit results
         if: always()

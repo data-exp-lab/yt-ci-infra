@@ -1,0 +1,32 @@
+# Reference copy. Canonical location: yt/tests/ci_install.sh
+#
+# Diff against upstream: step 1 is skipped when YT_CI_SKIP_SYSTEM_DEPS=1. Unset everywhere
+# else, so GitHub-hosted jobs are unchanged.
+set -x   # Show which command is being run
+
+# Step 1: install system level dependencies for ratarmount
+# YT_CI_SKIP_SYSTEM_DEPS=1 is for self-hosted runners that preinstall them and have no sudo.
+if [[ ${sync_args} == *"full"* && ${YT_CI_SKIP_SYSTEM_DEPS:-} != "1" ]]; then
+    case ${RUNNER_OS} in
+    linux|Linux)
+        sudo apt-get -qqy update
+        sudo apt-get -qqy install libfuse2
+        ;;
+    osx|macOS)
+        sudo mkdir -p /usr/local/man
+        sudo chown -R "${USER}:admin" /usr/local/man
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install macfuse
+        ;;
+    esac
+fi
+
+# Step 2: install deps and yt
+# installing in editable mode so this script may be used locally by developers
+# but the primary intention is to embed this script in CI jobs
+uv sync --extra=test ${sync_args}
+
+# Disable excessive output
+uv run --no-sync yt config set --local yt log_level 50
+cat yt.toml
+
+set +x

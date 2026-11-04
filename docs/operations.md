@@ -7,11 +7,12 @@ For first-time setup see `deploy.md`.
 | what | where |
 |------|-------|
 | controller code | `/opt/yt-controller` (symlink into the `/opt/yt-ci-infra` checkout) |
+| worker scripts | `/opt/yt-ci-infra` checkout (owned by the login user); `provision.sh` installs `boot-runner.sh` into `/opt/yt-runner` |
 | controller secrets | `/etc/yt-controller/env`, `~yt-controller/.config/openstack/clouds.yaml` |
 | controller state | `/var/lib/yt-controller/state.json` (last-activity timestamp; safe to delete) |
 | controller logs | `journalctl -u yt-controller`, `journalctl -u yt-controller-idle-shelver` |
 | worker runner | `/opt/yt-runner`, job workspaces under `_work/`, diagnostics under `_diag/` |
-| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `ANSWERS_MODE`) |
+| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `YT_TEST_DATA_DIR`, `YT_ANSWERS_DIR`, `ANSWERS_MODE`). The two mount paths are the single source: `boot-runner.sh` mounts there and exports `YT_TEST_DATA_DIR` into every job via the runner's `.env` file. |
 | worker logs | `journalctl -u yt-runner` |
 | datasets | `/mnt/yt-data` on the worker, volume `yt-data`, always read-only |
 | answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |
@@ -87,7 +88,7 @@ The version is wired in three places, plus one consequence on the answers volume
 | where | what |
 |-------|------|
 | `worker/provision.sh` | `uv python install 3.10` puts the interpreter on the worker. Add the new one (keep the old until its stores are retired): `sudo -u runner ~runner/.local/bin/uv python install 3.11` on the live worker, and bump the script for the next rebuild. |
-| yt: `tests/run_answer_tests.sh` | `PYTHON_VERSION` default. Drives `uv sync --python` and the path of the nose patch (`.venv/lib/python3.X/site-packages/nose`). Reference copy: `yt-side/run_answer_tests.sh`. |
+| yt: `.github/workflows/answer-tests.yml` | `PYTHON_VERSION` job env. Drives `UV_PYTHON` for `ci_install.sh` and the path of the nose patch (`.venv/lib/python3.X/site-packages/nose`). Reference copy: `yt-side/answer-tests.yml`. |
 | yt: `.github/workflows/build-test.yaml` | the nose jobs pin `python-version: '3.10'`. Not required for the worker, but keep them in step so one version of nose is in use. |
 | answers volume | `nose_runner.py` prefixes every store with the interpreter version: `py310_local_art_004` becomes `py311_local_art_004`. Nothing carries over. Every group is a missing store under the new prefix. |
 
@@ -95,9 +96,8 @@ That last row is the real cost. The procedure:
 
 1. Pick a trusted ref (a green run on the current version, or the last-known-good commit).
 2. Set `ANSWERS_MODE=rw` on the worker (see "Baseline / store runs" above).
-3. Dispatch with `ref=<trusted>` and the new `PYTHON_VERSION`. Since the script reads it from
-   the environment, the cleanest way is a one-line change to the default in
-   `tests/run_answer_tests.sh` on the ref you dispatch from. Every group generates under the
+3. Dispatch with `ref=<trusted>` and the new `PYTHON_VERSION`: a one-line change to the job
+   env in `.github/workflows/answer-tests.yml` on the ref you dispatch from. Every group generates under the
    new prefix; compare pass runs against its own output and should be green.
 4. Set `ANSWERS_MODE=ro` back.
 5. Dispatch `main` on the new version with answers read-only. Differences here are interpreter or
@@ -181,7 +181,7 @@ Known gaps as of 2026-11-03, all tests that skip:
 **Verifying the volume (worker).** After seeding, and again before any baseline run:
 
 ```
-sudo ./seed-data-volume.sh verify datasets.json
+cd /opt/yt-ci-infra && sudo ./infra/seed-data-volume.sh verify infra/datasets.json
 ```
 
 
@@ -196,7 +196,7 @@ openstack server remove volume yt-worker yt-data
 openstack server remove volume yt-worker yt-answers
 openstack server delete yt-worker
 IMAGE=... ./infra/create.sh                  # recreates only the missing worker, re-attaches volumes
-# then worker/provision.sh as in deploy.md step 3, and shelve
+# then clone the repo and run worker/provision.sh as in deploy.md steps 2 and 3, and shelve
 ```
 
 The volumes are untouched by this. Alternative with less downtime: snapshot the provisioned
@@ -213,6 +213,20 @@ sudo systemctl restart yt-controller
 ```
 
 If a systemd unit changed: copy it to `/etc/systemd/system/` and `systemctl daemon-reload` first.
+
+## Update the worker scripts
+
+The worker has its own checkout at `/opt/yt-ci-infra`, owned by the login user. `provision.sh`
+is safe to re-run and is the simplest way to install a changed `boot-runner.sh`, unit file, or
+`/etc/yt-runner/env` (it rewrites that file, so `ANSWERS_MODE` goes back to `ro`):
+
+```
+cd /opt/yt-ci-infra && git pull
+sudo CONTROLLER_URL=http://<controller private ip>:8080 ./worker/provision.sh
+```
+
+For a change to `boot-runner.sh` alone, `sudo install -m 0755 worker/boot-runner.sh /opt/yt-runner/`
+and restart `yt-runner.service` (or just shelve; it runs at every boot).
 
 ## Runner lifecycle on the worker
 

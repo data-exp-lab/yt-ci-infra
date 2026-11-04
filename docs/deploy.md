@@ -122,14 +122,20 @@ Test with `ssh yt-controller`. A timeout usually means your public IP is no long
 `operations.md`, "Dataset pre-flight". Fetching 38 GB of tarballs takes a while; the script
 reports failures at the end and can be re-run to pick up only what is missing.
 
+The worker gets its own checkout of this repo, at the same path as on the controller. It has no
+floating IP but outbound access works, and the repo is public, so a plain HTTPS clone needs no
+credentials. Owned by the login user so `git pull` works without sudo.
+
 ```
-scp infra/seed-data-volume.sh infra/seed-answers-volume.sh infra/datasets.json yt-worker:
 ssh yt-worker
-sudo lsblk                                            # 200G is yt-data, 50G is yt-answers
-sudo DATA_DEV=/dev/sdc ./seed-data-volume.sh format     # the 200G device
-sudo ./seed-data-volume.sh fetch datasets.json
-sudo ./seed-data-volume.sh verify datasets.json
-sudo ANSWERS_DEV=/dev/sdb ./seed-answers-volume.sh format  # the 50G device
+sudo git clone https://github.com/data-exp-lab/yt-ci-infra /opt/yt-ci-infra
+sudo chown -R "$USER": /opt/yt-ci-infra
+cd /opt/yt-ci-infra
+sudo lsblk                                                    # 200G is yt-data, 50G is yt-answers
+sudo DATA_DEV=/dev/sdc ./infra/seed-data-volume.sh format     # the 200G device
+sudo ./infra/seed-data-volume.sh fetch infra/datasets.json
+sudo ./infra/seed-data-volume.sh verify infra/datasets.json
+sudo ANSWERS_DEV=/dev/sdb ./infra/seed-answers-volume.sh format  # the 50G device
 ```
 
 The answers script only formats the volume and leaves an empty `answers/` directory, root-owned
@@ -143,8 +149,8 @@ does not cost a re-download. The volumes persist independently of the worker.
 ## 3. Provision the worker (on the worker)
 
 ```
-scp -r worker yt-worker:
 ssh yt-worker
+cd /opt/yt-ci-infra && git pull
 sudo CONTROLLER_URL=http://<controller private ip>:8080 ./worker/provision.sh
 ```
 
@@ -170,7 +176,7 @@ confirm they come back mounted.
 ```
 ssh yt-controller
 sudo useradd --system --create-home yt-controller
-sudo git clone https://github.com/yt-project/yt-ci-infra /opt/yt-ci-infra
+sudo git clone https://github.com/data-exp-lab/yt-ci-infra /opt/yt-ci-infra
 sudo chown -R yt-controller: /opt/yt-ci-infra
 sudo ln -s /opt/yt-ci-infra/controller /opt/yt-controller
 sudo -u yt-controller bash -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
@@ -228,13 +234,14 @@ journalctl -u yt-controller -f
 
 ## 5. The yt side
 
-Two files go into the yt repo (the fork during v0/v1). Reference copies, with an explanation
-of what they do, are in `yt-side/`:
+Three files go into the yt repo (the fork during v0/v1): one new workflow and two edited test
+helpers. Reference copies, with an explanation of what changed and why, are in `yt-side/`:
 
 | copy here | destination in yt |
 |-----------|-------------------|
-| `yt-side/answer-tests.yml` | `.github/workflows/answer-tests.yml` |
-| `yt-side/run_answer_tests.sh` | `tests/run_answer_tests.sh` |
+| `yt-side/answer-tests.yml` | `.github/workflows/answer-tests.yml` (new) |
+| `yt-side/nose_runner.py` | `tests/nose_runner.py` (replace) |
+| `yt-side/ci_install.sh` | `tests/ci_install.sh` (replace) |
 
 Then enable Actions on the fork (disabled on forks by default; button on its Actions tab).
 `workflow_dispatch` runs from whichever branch you pick in the dropdown, so the files can sit
