@@ -246,9 +246,13 @@ helpers. Reference copies, with an explanation of what changed and why, are in `
 | `yt-side/ci_install.sh` | `tests/ci_install.sh` (replace) |
 
 Then enable Actions on the fork (disabled on forks by default; button on its Actions tab).
-`workflow_dispatch` runs from whichever branch you pick in the dropdown, so the files can sit
-on a feature branch for v0. The `/run-answer-tests` comment path reads the workflow from the
-default branch, so merge them there before testing v1.
+GitHub only indexes workflows that exist on the repository's **default branch**: a workflow
+that lives only on a feature branch does not appear in the Actions tab and `gh workflow run`
+cannot find it. On the fork the least invasive fix is to make the feature branch the default
+for the duration (`gh repo edit chrishavlin/yt --default-branch <branch>`), switching back
+afterwards; merging into the fork's `main` also works. Once indexed, a dispatch can target
+any ref that carries the file. The `/run-answer-tests` comment path likewise reads the
+workflow from the default branch.
 
 The workflow's `runs-on: [self-hosted, jetstream]` label must match `RUNNER_LABEL`.
 

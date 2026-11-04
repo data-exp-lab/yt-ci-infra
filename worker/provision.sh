@@ -17,7 +17,7 @@ apt-get update
 apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential pkg-config \
     libhdf5-dev libopenmpi-dev libnetcdf-dev \
-    libfuse2 jq rsync bc
+    libfuse2 jq rsync bc gh
 
 # The runner self-updates between rebuilds (its directory is on the root disk, which shelving
 # keeps), so the version only has to be current at provision time.

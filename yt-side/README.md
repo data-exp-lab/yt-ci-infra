@@ -10,7 +10,10 @@ workflows from the repository they run in, so the canonical versions are:
 | `ci_install.sh` | `tests/ci_install.sh` | modified; replace the whole file |
 
 They are kept here because they are the contract between the yt repo and this
-infrastructure: the runner label, the mount paths, the Python version, the status context.
+infrastructure: the runner label, the mount paths, the Python version, the status context,
+and the tools the job expects on the worker (`gh` for the status steps, `uv`, `libfuse2`),
+which `worker/provision.sh` installs. GitHub-hosted runners have `gh` preinstalled; a
+self-hosted one does not.
 When any of those change, change both copies. During v0/v1 the live copies are on the fork
 `chrishavlin/yt`; see `docs/deploy.md` step 5.
 
