@@ -12,7 +12,7 @@ For first-time setup see `deploy.md`.
 | controller state | `/var/lib/yt-controller/state.json` (last-activity timestamp; safe to delete) |
 | controller logs | `journalctl -u yt-controller`, `journalctl -u yt-controller-idle-shelver` |
 | worker runner | `/opt/yt-runner`, job workspaces under `_work/`, diagnostics under `_diag/` |
-| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `YT_TEST_DATA_DIR`, `YT_ANSWERS_DIR`, `ANSWERS_MODE`). The two mount paths are the single source: `boot-runner.sh` mounts there and exports `YT_TEST_DATA_DIR` into every job via the runner's `.env` file. |
+| worker config | `/etc/yt-runner/env` (`CONTROLLER_URL`, `YT_TEST_DATA_DIR`, `YT_ANSWERS_DIR`, `ANSWERS_MODE`). The two mount paths are the single source: `boot-runner.sh` mounts there and exports `YT_TEST_DATA_DIR` into the runner's environment, which every job inherits. |
 | worker logs | `journalctl -u yt-runner` |
 | datasets | `/mnt/yt-data` on the worker, volume `yt-data`, always read-only |
 | answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |

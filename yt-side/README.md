@@ -42,9 +42,9 @@ Dispatch inputs:
 | `groups` | comma-separated `tests/tests.yaml` answer-test keys to run; blank = everything |
 
 The workflow does not know where the data lives. `YT_TEST_DATA_DIR` and the `PATH` entry for
-`uv` are exported by the worker: `boot-runner.sh` writes the runner's `.env` and `.path` files
-from `/etc/yt-runner/env` before every job, and the runner injects them into the job. yt itself
-does not read `YT_TEST_DATA_DIR`, which is why the run step still calls `yt config set`.
+`uv` are exported into the runner's environment by `boot-runner.sh` on the worker, from
+`/etc/yt-runner/env`, and jobs inherit that environment. yt itself does not read
+`YT_TEST_DATA_DIR`, which is why the run step still calls `yt config set`.
 
 `PYTHON_VERSION` is a job-level env in the workflow. It drives `UV_PYTHON` for the install and
 the path of the nose patch. Answer stores on the worker are prefixed `py310_`, so bumping it

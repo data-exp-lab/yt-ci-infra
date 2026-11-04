@@ -30,17 +30,20 @@ mount_volumes() {
     echo "mounted: yt-data ro at $YT_TEST_DATA_DIR, yt-answers ${ANSWERS_MODE} at $YT_ANSWERS_DIR"
 }
 
-# The runner exports every line of its .env file into each job's environment and takes the
-# job PATH from .path. This is how the workflow learns the data mount and finds uv without
-# either path appearing in the yt repo.
-write_job_env() {
-    printf 'YT_TEST_DATA_DIR=%s\n' "$YT_TEST_DATA_DIR" > "$RUNNER_HOME/.env"
-    printf '%s\n' "$HOME/.local/bin:$PATH" > "$RUNNER_HOME/.path"
+# Jobs inherit the listener's process environment. This is how the workflow learns the data
+# mount and finds uv without either path appearing in the yt repo. (The runner's own .env and
+# .path files are just another way to populate that environment: .env is read by the listener,
+# .path only by the svc.sh service wrapper we do not use. A stale .env would override what is
+# exported here, so make sure neither exists.)
+export_job_env() {
+    export YT_TEST_DATA_DIR
+    export PATH="$HOME/.local/bin:$PATH"
+    rm -f "$RUNNER_HOME/.env" "$RUNNER_HOME/.path"
 }
 
 run_one_job() {
     cd "$RUNNER_HOME"
-    write_job_env
+    export_job_env
     local cfg
     # Controller may still be settling or the private network may lag the boot; retry briefly.
     for attempt in $(seq 1 12); do
