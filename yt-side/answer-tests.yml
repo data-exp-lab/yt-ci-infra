@@ -2,7 +2,9 @@
 name: answer-tests
 
 on:
-  issue_comment:
+  # The comment trigger is gated: authorize checks the commenter's write permission before any
+  # untrusted code is checked out, and comment-triggered runs use this file from the default branch.
+  issue_comment: # zizmor: ignore[dangerous-triggers]
     types: [created]
   workflow_dispatch:
     inputs:
@@ -16,10 +18,7 @@ on:
         description: "Comma-separated answer-test group keys from tests/tests.yaml (blank = all)"
         required: false
 
-permissions:
-  contents: read
-  pull-requests: write
-  statuses: write
+permissions: {}
 
 jobs:
   authorize:
@@ -28,6 +27,10 @@ jobs:
       (github.event.issue.pull_request &&
        contains(github.event.comment.body, '/run-answer-tests'))
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # commits/{ref} lookup
+      pull-requests: read   # pulls/{pr} head SHA
+      issues: write         # reaction on the triggering comment (PR comments are issue comments)
     outputs:
       sha: ${{ steps.pin.outputs.sha }}
       groups: ${{ steps.pin.outputs.groups }}
@@ -75,6 +78,9 @@ jobs:
     needs: authorize
     runs-on: [self-hosted, jetstream]
     timeout-minutes: 240
+    permissions:
+      contents: read        # checkout
+      statuses: write       # commit status on the tested SHA
     env:
       # Answer stores on the worker are py310_* prefixed; bump here and regenerate them
       # together (see yt-ci-infra docs/operations.md, "Bumping the Python version").
@@ -84,12 +90,14 @@ jobs:
       - name: Mark pending on the commit
         env:
           GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.authorize.outputs.sha }}
         run: >
-          gh api "repos/${{ github.repository }}/statuses/${{ needs.authorize.outputs.sha }}"
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}"
           -f state=pending -f context=answer-tests
-          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
-      - uses: actions/checkout@v4
+      # pinned to the same hashes as build-test.yaml so dependabot bumps them together
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.authorize.outputs.sha }}
           submodules: true
@@ -124,7 +132,7 @@ jobs:
 
       - name: Upload xunit results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: answer-tests-xunit-${{ needs.authorize.outputs.sha }}
           path: "*.xml"
@@ -134,8 +142,10 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.authorize.outputs.sha }}
+          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
         run: >
-          gh api "repos/${{ github.repository }}/statuses/${{ needs.authorize.outputs.sha }}"
-          -f state=${{ job.status == 'success' && 'success' || 'failure' }}
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${SHA}"
+          -f state="${STATE}"
           -f context=answer-tests
-          -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

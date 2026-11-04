@@ -1,7 +1,3 @@
-# Reference copy. Canonical location: yt/tests/ci_install.sh
-#
-# Diff against upstream: step 1 is skipped when YT_CI_SKIP_SYSTEM_DEPS=1. Unset everywhere
-# else, so GitHub-hosted jobs are unchanged.
 set -x   # Show which command is being run
 
 # Step 1: install system level dependencies for ratarmount

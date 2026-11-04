@@ -1,8 +1,3 @@
-# Reference copy. Canonical location: yt/tests/nose_runner.py
-#
-# Diff against upstream: argparse (--groups, --unittests/--no-unittests, --num-workers),
-# YT_TEST_GROUPS env fallback, tests.yaml filtered in memory instead of rewritten on disk,
-# and a nonzero exit when any nose run reports failure (upstream always exits 0).
 import argparse
 import multiprocessing
 import os

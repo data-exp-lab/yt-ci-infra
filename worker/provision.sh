@@ -4,7 +4,7 @@
 # Re-run after a rebuild from image; see docs/operations.md.
 set -euo pipefail
 
-RUNNER_VERSION="${RUNNER_VERSION:-2.321.0}"   # TODO: bump to current before first provision
+RUNNER_VERSION="${RUNNER_VERSION:-}"   # blank = current actions/runner release, resolved below
 RUNNER_USER=runner
 RUNNER_HOME=/opt/yt-runner
 CONTROLLER_URL="${CONTROLLER_URL:?set CONTROLLER_URL=http://<controller-private-ip>:8080}"
@@ -18,6 +18,15 @@ apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential pkg-config \
     libhdf5-dev libopenmpi-dev libnetcdf-dev \
     libfuse2 jq rsync bc
+
+# The runner self-updates between rebuilds (its directory is on the root disk, which shelving
+# keeps), so the version only has to be current at provision time.
+if [ -z "$RUNNER_VERSION" ]; then
+    RUNNER_VERSION=$(curl -fsSL https://api.github.com/repos/actions/runner/releases/latest | jq -r '.tag_name | ltrimstr("v")')
+    [ -n "$RUNNER_VERSION" ] && [ "$RUNNER_VERSION" != "null" ] \
+        || { echo "could not resolve the latest actions/runner release; set RUNNER_VERSION" >&2; exit 1; }
+fi
+echo "actions/runner ${RUNNER_VERSION}"
 
 id -u "$RUNNER_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir /home/$RUNNER_USER --shell /bin/bash "$RUNNER_USER"
 
