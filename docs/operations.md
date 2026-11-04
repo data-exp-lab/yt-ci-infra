@@ -72,6 +72,12 @@ trusted ref:
 
 Shelve files are dbm-backend dependent: generate stores on the worker, never copy from a laptop.
 
+A store run that fails partway (missing dataset permissions, a crash in the first test) leaves
+`<answers>/<py3XX_group>/` behind empty; yt's plugin creates the directory before any test runs.
+Upstream `nose_runner.py` keyed "store or compare" on that directory existing, so every later run
+would compare against nothing (`YTNoOldAnswer` on every test). The runner in `yt-side/` tests
+for the shelve file instead. On an older runner, `rm -rf` the empty directory and dispatch again.
+
 ## Change the Python version the suite runs on
 
 Starting point is 3.10 because that is what the last Jenkins run used. The ceiling for the
