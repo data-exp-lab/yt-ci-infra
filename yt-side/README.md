@@ -20,8 +20,10 @@ When any of those change, change both copies. During v0/v1 the live copies are o
 ## What the workflow does
 
 - Triggers: `workflow_dispatch` (anyone with write access, via the Actions tab) and an
-  `issue_comment` containing `/run-answer-tests` on a PR. Comment-triggered runs use the
-  workflow file from the default branch, so a PR cannot alter the gate.
+  `issue_comment` on a PR whose entire body is `/run-answer-tests` (a comment that merely
+  contains it, or adds anything after it, fails in `authorize`; the comment body is never
+  parsed). Comment-triggered runs use the workflow file from the default branch, so a PR
+  cannot alter the gate. Subsets of groups are `workflow_dispatch` only.
 - `authorize` (on `ubuntu-latest`, free): for comments, requires the commenter to have
   `admin`, `maintain`, or `write` permission (not `triage`, not `author_association`). Pins
   the SHA to test at that moment, so a later push to the PR does not run. Reacts 🚀 to the
