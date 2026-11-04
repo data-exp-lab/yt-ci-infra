@@ -58,14 +58,18 @@ class GitHub:
         return False
 
     def generate_jitconfig(self, label: str, name: str | None = None) -> dict:
-        """Mint a single-use ephemeral runner config. Needs repo Administration write."""
+        """Mint a single-use ephemeral runner config. Needs repo Administration write.
+
+        JIT runners carry only the labels requested here; the `self-hosted` label that
+        config.sh adds by default is not implied, and the workflow's runs-on names both.
+        """
         name = name or f"yt-worker-{int(time.time())}"
         data = self._post(
             f"/repos/{self.repo}/actions/runners/generate-jitconfig",
             json={
                 "name": name,
                 "runner_group_id": 1,
-                "labels": [label],
+                "labels": ["self-hosted", label],
                 "work_folder": "_work",
             },
         )

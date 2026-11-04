@@ -258,14 +258,36 @@ Validates the worker image, volume mounts, JIT handoff, ephemeral runner, the su
 reporting, with the controller only serving configs. Leave `yt-controller.service` stopped and run
 `yt-controller serve` in a tmux instead, so nothing shelves the worker under you.
 
-1. Unshelve the worker: Horizon Actions → Unshelve, Exosphere, `openstack server unshelve yt-worker`,
-   or `yt-controller unshelve`. Wait for ACTIVE.
-2. On the controller, watch `journalctl -u yt-controller` (or the `serve` output) for
-   `issued runner config`.
-3. `gh api repos/chrishavlin/yt/actions/runners` shows one runner labelled `jetstream`, `online`.
-4. Actions tab on the fork: run `answer-tests` via `workflow_dispatch`. Start with a `groups`
-   input naming one small group (e.g. `local_art_004`) so the first round trip takes minutes,
-   not an hour. `pr` or `ref` pins what to check out.
+0. No answer stores exist yet, so the first run of every group is a store run and needs the
+   answers volume writable: set `ANSWERS_MODE=rw` in `/etc/yt-runner/env` on the worker
+   (`operations.md`, "Baseline / store runs"). Set it back to `ro` before the first PR run.
+1. On the controller, start the config endpoint in a tmux session so it outlives your ssh login:
+
+   ```
+   tmux new -s serve
+   cd /opt/yt-controller && sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller serve
+   ```
+
+   As the service user, since that is whose `~/.config/openstack/clouds.yaml` the SDK reads
+   (as `ubuntu` it fails with `Cloud jetstream was not found`). Detach with `Ctrl-b` then `d`;
+   reattach with `tmux attach -t serve`.
+2. Get the worker's runner service running. One of:
+   - Worker shelved: unshelve it (Horizon Actions → Unshelve, Exosphere,
+     `openstack server unshelve yt-worker`, or `yt-controller unshelve`) and wait for ACTIVE.
+     `yt-runner.service` starts at boot and registers on its own.
+   - Worker already up (right after provisioning, say): the service tried at boot, found nothing
+     serving, and stays down. Start it by hand on the worker:
+     `sudo systemctl start yt-runner.service && journalctl -u yt-runner -f`.
+3. Confirm the handoff. The serve window on the controller (reattach with `tmux attach -t serve`)
+   logs `issued runner config`; the worker journal shows the mount line and
+   `registering as ...; taking one job`. From the laptop,
+   `gh api repos/chrishavlin/yt/actions/runners` then lists one runner labelled `jetstream`,
+   `online`. It lists nothing until the service has registered.
+4. Dispatch. Actions tab on the fork, workflow `answer-tests`, branch dropdown set to the
+   branch carrying the workflow, `groups` input naming one small group (e.g. `local_art_004`)
+   so the first round trip takes minutes, not an hour. `pr` or `ref` pins what to check out.
+   CLI equivalent: `gh workflow run answer-tests --repo chrishavlin/yt --ref <branch> -f groups=local_art_004`,
+   then `gh run watch --repo chrishavlin/yt`.
 5. The runner goes `busy`; the job log streams; on completion the runner deregisters and
    `yt-runner.service` restarts on the worker, fetching a fresh config and waiting for the
    next job.
