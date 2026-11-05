@@ -18,48 +18,243 @@ For first-time setup see `deploy.md`.
 | answer stores | `/mnt/yt-answers/answers` on the worker, volume `yt-answers`, always read-write; reached via the symlink `/mnt/yt-data/answers` because `nose_runner.py` hardcodes `<test_data_dir>/answers` |
 | yt-side files | `yt-side/` here; canonical copies in the yt repo |
 
-## Is it healthy?
+## Controller
+
+### Running the controller CLI
+
+`yt-controller` is not on anyone's PATH. It lives in the service venv and needs the service
+user's environment: the token and repo settings from `/etc/yt-controller/env`, and the OpenStack
+application credential in `~yt-controller/.config/openstack/clouds.yaml`. Run it as that user
+from the checkout, with the env file loaded:
 
 ```
-yt-controller status
+cd /opt/yt-controller && sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller status
+```
+
+Every `yt-controller <subcommand>` below means this invocation. Run as the login user it fails
+on OpenStack auth, because that user has no `clouds.yaml`. In normal operation the service and
+timer run `serve` and `idle-shelver` for you; the manual subcommands are for maintenance windows.
+
+### Stop and start the controller
+
+Two systemd units run the automation on the controller. `yt-controller.service` polls GitHub
+for queued answer-test jobs, unshelves the worker when one appears, hands the worker its
+one-time runner registration when it boots, and shelves it again once it has been idle for
+`GRACE_SECONDS`. `yt-controller-idle-shelver.timer` is a backstop that shelves a worker the
+service has somehow left running. Stop both before any maintenance that needs the worker up
+without a job, such as the manual baseline run or re-provisioning the worker scripts;
+otherwise a worker you unshelved by hand looks idle and gets shelved under you.
+
+```
+sudo systemctl stop yt-controller-idle-shelver.timer yt-controller
+systemctl is-active yt-controller yt-controller-idle-shelver.timer   # both: inactive
+```
+
+Stop, not disable: `disable` also drops them from boot, and they should come back if the
+controller reboots. While stopped, nothing unshelves the worker; a dispatched job sits queued
+until the loop is back, and a worker left ACTIVE keeps billing. Resume with:
+
+```
+sudo systemctl start yt-controller yt-controller-idle-shelver.timer
+systemctl is-active yt-controller yt-controller-idle-shelver.timer   # both: active
+```
+
+The loop's first pass runs at once, so a queued job is picked up within `POLL_SECONDS` and an
+idle ACTIVE worker is shelved once its grace period has elapsed.
+
+### Is it healthy?
+
+Healthy means two things: the controller loop is running, and the worker is in the state the
+GitHub queue calls for (shelved when nothing is queued, active when something is). Check both.
+
+**1. The controller units are up.** On the controller:
+
+```
+systemctl is-active yt-controller yt-controller-idle-shelver.timer   # both: active
+journalctl -u yt-controller -n 5                                     # a reconcile line within the last POLL_SECONDS
+```
+
+Each reconcile line looks like `queued=0 busy=False worker=SHELVED_OFFLOADED idle=n/a -> none`.
+A `reconcile cycle failed` traceback means the loop is alive but a GitHub or OpenStack call is
+failing; the exception says which.
+
+**2. The worker state matches the queue.** On the controller:
+
+```
+cd /opt/yt-controller && sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller status
+```
+
+It prints `queued` (jobs waiting for our label), `busy` (a runner is executing), `worker` (the
+OpenStack status), `idle` (seconds since the last queued or busy observation), and `would` (what
+the next reconcile pass will do). The normal combinations:
+
+| situation | queued / busy | worker | would |
+|---|---|---|---|
+| resting, nothing dispatched | 0 / False | `SHELVED_OFFLOADED` | `none` |
+| job dispatched, worker waking | >0 / False | `UNSHELVING` then `ACTIVE` | `none` |
+| job running | 0 / True | `ACTIVE` | `none` |
+| job finished, grace period | 0 / False, idle < `GRACE_SECONDS` | `ACTIVE` | `none` |
+| job finished, grace elapsed | 0 / False, idle > `GRACE_SECONDS` | `ACTIVE` | `shelve` (the loop does it on its next pass) |
+
+Anything else is a fault. The usual ones:
+
+- `queued > 0` and `worker=SHELVED_OFFLOADED` for longer than `POLL_SECONDS` plus a few minutes
+  of unshelve: the loop is not acting. Check step 1.
+- `worker=ACTIVE`, `would=none`, nothing queued or busy for much longer than `GRACE_SECONDS`:
+  the idle counter is stuck or the loop is dead. The idle-shelver timer should catch this after
+  `IDLE_SHELVE_SECONDS`; if the worker is still up past that, shelve by hand (next section) and
+  read both journals.
+- `worker=ACTIVE` and a job sits "Waiting for a runner" for more than a few minutes: the worker
+  is up but no runner registered. `journalctl -u yt-runner` on the worker; see "Runner lifecycle
+  on the worker" and the JIT gotcha.
+- `worker=ERROR` or a transitional state (`SHELVING`, `UNSHELVING`) that does not clear within
+  a few minutes: an OpenStack problem. `openstack server show yt-worker` from a laptop.
+
+Cross-checks that do not need the controller box, with your own `clouds.yaml` and `gh` login:
+
+```
 openstack server show yt-worker -c status -c updated_at
-gh api repos/$GITHUB_REPO/actions/runners --jq '.runners[] | {name, status, busy}'
+gh api repos/<owner>/<repo>/actions/runners --jq '.runners[] | {name, status, busy}'
 ```
 
-Shelved worker + no queued jobs + no runners is the normal resting state.
+The runner list is empty when the worker is shelved; an ACTIVE worker shows exactly one runner,
+`online`, busy or not. Two or more runners, or an `offline` one that persists, means stale
+registrations GitHub has not yet dropped; harmless but worth a look if jobs are not matching.
 
-## Force a shelve / unshelve
+### Force a shelve / unshelve
 
 ```
-yt-controller shelve      # waits for SHELVED_OFFLOADED
-yt-controller unshelve    # waits for ACTIVE; the worker boots and fetches a runner config
+cd /opt/yt-controller
+sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller shelve      # waits for SHELVED_OFFLOADED
+sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller unshelve    # waits for ACTIVE; the worker boots and fetches a runner config
 ```
 
-Or `openstack server shelve|unshelve yt-worker`. Never `stop` or `suspend`: those bill at 50% and
-75% respectively. Shelved bills zero.
+Or `openstack server shelve|unshelve yt-worker` from anywhere with a `clouds.yaml`, including a
+laptop; that returns at once, so poll `openstack server show yt-worker -c status` for the
+transition. Never `stop` or `suspend`: those bill at 50% and 75% respectively. Shelved bills zero.
 
-If the controller is misbehaving, `systemctl stop yt-controller` first so it does not fight you.
-The idle shelver timer keeps running and will shelve an idle worker after `IDLE_SHELVE_SECONDS`;
-stop `yt-controller-idle-shelver.timer` too if you need the worker up for interactive work.
+If you need the worker up for interactive work, stop both controller units first ("Stop and
+start the controller"); otherwise the loop or the idle-shelver timer shelves it under you.
 
-## Rotate the GitHub token
+### Rotate the GitHub token
 
 1. Mint the new token (same permissions: Administration r/w, Actions read, scoped to the repo).
 2. Edit `GITHUB_TOKEN` in `/etc/yt-controller/env`.
-3. `systemctl restart yt-controller`; check `yt-controller status` works.
+3. `systemctl restart yt-controller`; check `yt-controller status` (full form under "Running the controller CLI") works.
 4. Revoke the old token on GitHub.
 
 Nothing on the worker changes: it never holds the token, only one-shot just-in-time (JIT)
 runner configs.
 
-## Rotate the OpenStack application credential
+### Rotate the OpenStack application credential
 
 1. Horizon → Identity → Application Credentials → create a new one, download `clouds.yaml`.
 2. Replace `~yt-controller/.config/openstack/clouds.yaml` (mode 600, owned by `yt-controller`).
-3. `systemctl restart yt-controller`; `yt-controller status` must show the worker.
+3. `systemctl restart yt-controller`; `yt-controller status` (full form under "Running the controller CLI") must show the worker.
 4. Delete the old credential in Horizon.
 
-## Answer stores: baselines and bumps
+### Update the controller code
+
+The controller's checkout is owned by `yt-controller`, so run git as that user; as the login
+user or root, git refuses with "dubious ownership" (do not add the `safe.directory` exception
+it suggests, and do not pull as root, which leaves root-owned files in the service user's tree).
+
+```
+sudo -u yt-controller git -C /opt/yt-ci-infra pull
+cd /opt/yt-controller && sudo -u yt-controller ~yt-controller/.local/bin/uv sync --no-dev
+sudo systemctl restart yt-controller
+```
+
+Skip the `uv sync` and restart when only docs or worker files changed.
+
+If a systemd unit changed: copy it to `/etc/systemd/system/` and `systemctl daemon-reload` first.
+
+## Worker
+
+### Stop and start the runner
+
+`yt-runner.service` is the only unit on the worker. It starts at every boot (so at every
+unshelve), mounts the two volumes, registers one single-use GitHub runner, takes one job, and
+restarts itself for the next. Stop it when you need the worker up but must not have a dispatched
+job land on it: the manual baseline run, or anything else that writes to the answers volume.
+Stop the controller first ("Stop and start the controller") or the worker gets shelved under you.
+
+```
+sudo systemctl stop yt-runner
+systemctl is-active yt-runner                      # inactive
+```
+
+The stop sends SIGINT, which the runner answers by deregistering from GitHub; it can take up
+to `TimeoutStopSec` (5 min) if a job is mid-flight, so stop it only when nothing is running.
+The mounts are made by the service's `ExecStartPre` and survive the stop, so `/mnt/yt-data`
+and `/mnt/yt-answers` stay usable. If you remounted `yt-data` read-write while the runner was
+down, the next start puts it back to read-only.
+
+```
+sudo systemctl start yt-runner
+systemctl is-active yt-runner                      # active
+journalctl -u yt-runner -n 20                      # "mounted: ..." then the listener waiting for a job
+```
+
+Or skip the start and shelve the worker instead; the service runs at the next unshelve anyway.
+Stop, not disable: `disable` would keep the runner from coming up at the next unshelve, and
+the controller would wake a worker that never registers.
+
+### Runner lifecycle on the worker
+
+`yt-runner.service` fetches a single-use config, takes one job, exits, and restarts itself to
+fetch the next. So an ACTIVE worker normally has one idle runner registered and waiting; that
+is not a fault. The controller shelves the instance once nothing has been queued or busy for
+`GRACE_SECONDS`, which kills the idle runner; GitHub drops the dead registration on its own.
+Small race: a job dispatched in the seconds between the shelve decision and the kill fails
+and must be re-run. Acceptable for v1.
+
+If the config fetch fails (controller down, security group wrong), the service exits non-zero
+and stays down until the next unshelve. `journalctl -u yt-runner` on the worker says why.
+
+### Update the worker scripts
+
+The worker has its own checkout at `/opt/yt-ci-infra`, owned by the login user. `provision.sh`
+is safe to re-run and is the simplest way to install a changed `boot-runner.sh`, unit file, or
+`/etc/yt-runner/env` (it rewrites that file). Do it with the controller stopped ("Stop and start
+the controller") and the worker unshelved by hand, so nothing shelves it or dispatches a job
+mid-provision.
+
+`provision.sh` needs `CONTROLLER_URL`, which the previous provision already wrote to the worker's
+env file. Read it from there rather than looking up the controller's private IP again:
+
+```
+sudo cat /etc/yt-runner/env                      # CONTROLLER_URL, YT_TEST_DATA_DIR, YT_ANSWERS_DIR
+cd /opt/yt-ci-infra && git pull
+sudo CONTROLLER_URL=$(sudo grep '^CONTROLLER_URL=' /etc/yt-runner/env | cut -d= -f2-) ./worker/provision.sh
+sudo cat /etc/yt-runner/env                      # same three variables; nothing stale left over
+```
+
+For a change to `boot-runner.sh` alone, `sudo install -m 0755 worker/boot-runner.sh /opt/yt-runner/`
+and restart `yt-runner.service` (or just shelve; it runs at every boot).
+
+### Rebuild the worker from clean
+
+Reasons: a job left the root disk in a bad state, a runner-version bump, or periodic hygiene
+(the worker runs maintainer-approved but still third-party code with network access).
+
+```
+openstack server unshelve yt-worker         # if shelved
+openstack server remove volume yt-worker yt-data
+openstack server remove volume yt-worker yt-answers
+openstack server delete yt-worker
+IMAGE=... ./infra/create.sh                  # recreates only the missing worker, re-attaches volumes
+# then clone the repo and run worker/provision.sh as in deploy.md steps 2 and 3, and shelve
+```
+
+The volumes are untouched by this. Alternative with less downtime: snapshot the provisioned
+worker once (`openstack server image create yt-worker --name yt-worker-golden`) and rebuild from
+that image instead of re-provisioning. TODO: decide after the first rebuild whether the snapshot
+is worth maintaining.
+
+## Answer tests
+
+### Answer stores: baselines and bumps
 
 The answers volume is always mounted read-write. There is no read-only mode: yt's answer plugin
 opens a store with `shelve.open` in its default create mode, which needs write access even to
@@ -119,7 +314,7 @@ once a later one exists.
 
 Shelve files are dbm-backend dependent: generate stores on the worker, never copy from a laptop.
 
-## Manual baseline run (outside the workflow)
+### Manual baseline run (outside the workflow)
 
 Use this when the trusted ref predates the harness, which is the case for the first baseline:
 the last known good commit is `66af53cedb7af599faf3c2471bcd380d961e37a6` (merge of PR #5143,
@@ -143,11 +338,12 @@ either). Do not take the whole `pyproject.toml` or `uv.lock`: those carry every 
 since the ref. Commit and push the branch to your fork. The two extra `tests.yaml` lines are
 `--ignore-file` entries for the unittests job; harmless if the files do not exist.
 
-**2. Keep the worker up, and alone.** On the controller:
+**2. Keep the worker up, and alone.** On the controller, stop both units ("Stop and start the
+controller"), then unshelve:
 
 ```
 sudo systemctl stop yt-controller-idle-shelver.timer yt-controller
-yt-controller unshelve
+cd /opt/yt-controller && sudo -u yt-controller env $(sudo grep -E '^[A-Z_]+=' /etc/yt-controller/env) .venv/bin/yt-controller unshelve
 ```
 
 Both shelvers decide "idle" from GitHub (queued jobs, runner busy), so a run outside the runner
@@ -159,9 +355,8 @@ sudo systemctl stop yt-runner
 mountpoint /mnt/yt-data && mountpoint /mnt/yt-answers && ls -ld /mnt/yt-answers/answers
 ```
 
-Stopping the runner guarantees no dispatched job writes stores at the same time. The mounts are
-made by the service's `ExecStartPre` and survive stopping it; the answers directory must be
-owned by `runner`.
+Stopping the runner ("Stop and start the runner") guarantees no dispatched job writes stores at
+the same time. The mounts survive the stop; the answers directory must be owned by `runner`.
 
 **3. Run as `runner`, in tmux.** Store files are owned by whoever writes them and the dbm format
 is the interpreter's, so this has to be the runner user with its own uv and Python 3.10, not
@@ -197,49 +392,13 @@ ls /mnt/yt-answers/answers            # one py310_<group> directory per answer_t
 openstack volume snapshot create --volume yt-answers --force yt-answers-$(date +%F)
 ```
 
-Restore the services (controller: `systemctl start yt-controller yt-controller-idle-shelver.timer`;
-worker: `systemctl start yt-runner`, or just `yt-controller shelve`, which the next unshelve boots
-clean). The clone under `~runner/baseline` can be deleted; the `.venv` in it is not reused by
-jobs.
+Restore the services: on the worker start the runner ("Stop and start the runner"), or just
+shelve it with the full `yt-controller shelve` form from "Force a shelve / unshelve", which the
+next unshelve boots clean; then on the controller start both units ("Stop and start the
+controller"). The clone
+under `~runner/baseline` can be deleted; the `.venv` in it is not reused by jobs.
 
-## Change the Python version the suite runs on
-
-Starting point is 3.10 because that is what the last Jenkins run used. The ceiling for the
-nose suite is **3.11**: nose 1.3.7's `importer.py` does `from imp import ...`, and `imp` was
-removed in Python 3.12. Beyond that means the pytest migration, not a version bump.
-
-Preferred order is pytest first, then 3.11, so the store regeneration below never has to
-happen for nose. Whether that holds depends on dev time against yt 4.5.0, which drops 3.10
-support: if 4.5.0 lands while the suite is still on nose, the worker has to move to 3.11 to
-test `main` at all, and the procedure below is the cost of that.
-
-The version is wired in three places, plus one consequence on the answers volume:
-
-| where | what |
-|-------|------|
-| `worker/provision.sh` | `uv python install 3.10` puts the interpreter on the worker. Add the new one (keep the old until its stores are retired): `sudo -u runner ~runner/.local/bin/uv python install 3.11` on the live worker, and bump the script for the next rebuild. |
-| yt: `.github/workflows/answer-tests.yml` | `PYTHON_VERSION` job env. Drives `UV_PYTHON` for `ci_install.sh` and the path of the nose patch (`.venv/lib/python3.X/site-packages/nose`). Reference copy: `yt-side/answer-tests.yml`. |
-| yt: `.github/workflows/build-test.yaml` | the nose jobs pin `python-version: '3.10'`. Not required for the worker, but keep them in step so one version of nose is in use. |
-| answers volume | `nose_runner.py` prefixes every store with the interpreter version: `py310_local_art_004` becomes `py311_local_art_004`. Nothing carries over. Every group is a missing store under the new prefix. |
-
-That last row is the real cost. The procedure:
-
-1. Pick a trusted ref (a green run on the current version, or the last-known-good commit).
-2. Dispatch with `ref=<trusted>`, `store_missing` on, and the new `PYTHON_VERSION`: a one-line
-   change to the job env in `.github/workflows/answer-tests.yml` on the ref you dispatch from.
-   Every group generates under the new prefix; compare pass runs against its own output and
-   should be green. Snapshot the volume.
-3. Dispatch `main` on the new version. Differences here are interpreter or
-   dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
-   before merging the version bump into the yt repo.
-4. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
-   them once nobody needs to compare against the old version (or wipe the whole volume with
-   `infra/seed-answers-volume.sh format` and regenerate; it never touches the datasets).
-
-Both prefixes can coexist on the volume, so there is no cut-over moment: a PR that bumps the
-version just runs against the new stores, and a PR that does not still runs against the old.
-
-## Dataset pre-flight
+### Dataset pre-flight
 
 With `strict_requires` on (the runner sets it), a missing dataset errors at collection and
 the group writes no store; the run reports it under `SKIPPED, datasets missing`. With it off,
@@ -328,61 +487,42 @@ sudo mount -o remount,rw /mnt/yt-data && sudo chmod -R a+rX /mnt/yt-data && sudo
 cd /opt/yt-ci-infra && sudo ./infra/seed-data-volume.sh verify infra/datasets.json
 ```
 
+### Change the Python version the suite runs on
 
-## Rebuild the worker from clean
+Starting point is 3.10 because that is what the last Jenkins run used. The ceiling for the
+nose suite is **3.11**: nose 1.3.7's `importer.py` does `from imp import ...`, and `imp` was
+removed in Python 3.12. Beyond that means the pytest migration, not a version bump.
 
-Reasons: a job left the root disk in a bad state, a runner-version bump, or periodic hygiene
-(the worker runs maintainer-approved but still third-party code with network access).
+Preferred order is pytest first, then 3.11, so the store regeneration below never has to
+happen for nose. Whether that holds depends on dev time against yt 4.5.0, which drops 3.10
+support: if 4.5.0 lands while the suite is still on nose, the worker has to move to 3.11 to
+test `main` at all, and the procedure below is the cost of that.
 
-```
-openstack server unshelve yt-worker         # if shelved
-openstack server remove volume yt-worker yt-data
-openstack server remove volume yt-worker yt-answers
-openstack server delete yt-worker
-IMAGE=... ./infra/create.sh                  # recreates only the missing worker, re-attaches volumes
-# then clone the repo and run worker/provision.sh as in deploy.md steps 2 and 3, and shelve
-```
+The version is wired in three places, plus one consequence on the answers volume:
 
-The volumes are untouched by this. Alternative with less downtime: snapshot the provisioned
-worker once (`openstack server image create yt-worker --name yt-worker-golden`) and rebuild from
-that image instead of re-provisioning. TODO: decide after the first rebuild whether the snapshot
-is worth maintaining.
+| where | what |
+|-------|------|
+| `worker/provision.sh` | `uv python install 3.10` puts the interpreter on the worker. Add the new one (keep the old until its stores are retired): `sudo -u runner ~runner/.local/bin/uv python install 3.11` on the live worker, and bump the script for the next rebuild. |
+| yt: `.github/workflows/answer-tests.yml` | `PYTHON_VERSION` job env. Drives `UV_PYTHON` for `ci_install.sh` and the path of the nose patch (`.venv/lib/python3.X/site-packages/nose`). Reference copy: `yt-side/answer-tests.yml`. |
+| yt: `.github/workflows/build-test.yaml` | the nose jobs pin `python-version: '3.10'`. Not required for the worker, but keep them in step so one version of nose is in use. |
+| answers volume | `nose_runner.py` prefixes every store with the interpreter version: `py310_local_art_004` becomes `py311_local_art_004`. Nothing carries over. Every group is a missing store under the new prefix. |
 
-## Update the controller code
+That last row is the real cost. The procedure:
 
-```
-cd /opt/yt-ci-infra && sudo git pull
-cd controller && sudo -u yt-controller ~yt-controller/.local/bin/uv sync --no-dev
-sudo systemctl restart yt-controller
-```
+1. Pick a trusted ref (a green run on the current version, or the last-known-good commit).
+2. Dispatch with `ref=<trusted>`, `store_missing` on, and the new `PYTHON_VERSION`: a one-line
+   change to the job env in `.github/workflows/answer-tests.yml` on the ref you dispatch from.
+   Every group generates under the new prefix; compare pass runs against its own output and
+   should be green. Snapshot the volume.
+3. Dispatch `main` on the new version. Differences here are interpreter or
+   dependency effects (a different numpy wheel resolves for 3.11), not code drift. Triage
+   before merging the version bump into the yt repo.
+4. Merge the bump in yt. The old `py310_*` directories on the volume are dead weight; delete
+   them once nobody needs to compare against the old version (or wipe the whole volume with
+   `infra/seed-answers-volume.sh format` and regenerate; it never touches the datasets).
 
-If a systemd unit changed: copy it to `/etc/systemd/system/` and `systemctl daemon-reload` first.
-
-## Update the worker scripts
-
-The worker has its own checkout at `/opt/yt-ci-infra`, owned by the login user. `provision.sh`
-is safe to re-run and is the simplest way to install a changed `boot-runner.sh`, unit file, or
-`/etc/yt-runner/env` (it rewrites that file):
-
-```
-cd /opt/yt-ci-infra && git pull
-sudo CONTROLLER_URL=http://<controller private ip>:8080 ./worker/provision.sh
-```
-
-For a change to `boot-runner.sh` alone, `sudo install -m 0755 worker/boot-runner.sh /opt/yt-runner/`
-and restart `yt-runner.service` (or just shelve; it runs at every boot).
-
-## Runner lifecycle on the worker
-
-`yt-runner.service` fetches a single-use config, takes one job, exits, and restarts itself to
-fetch the next. So an ACTIVE worker normally has one idle runner registered and waiting; that
-is not a fault. The controller shelves the instance once nothing has been queued or busy for
-`GRACE_SECONDS`, which kills the idle runner; GitHub drops the dead registration on its own.
-Small race: a job dispatched in the seconds between the shelve decision and the kill fails
-and must be re-run. Acceptable for v1.
-
-If the config fetch fails (controller down, security group wrong), the service exits non-zero
-and stays down until the next unshelve. `journalctl -u yt-runner` on the worker says why.
+Both prefixes can coexist on the volume, so there is no cut-over moment: a PR that bumps the
+version just runs against the new stores, and a PR that does not still runs against the old.
 
 ## Known gotchas
 

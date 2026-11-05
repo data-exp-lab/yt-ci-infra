@@ -48,7 +48,7 @@ The workflow does not know where the data lives. `YT_TEST_DATA_DIR` and the `PAT
 
 `PYTHON_VERSION` is a job-level env in the workflow. It drives `UV_PYTHON` for the install and
 the path of the nose patch. Answer stores on the worker are prefixed `py310_`, so bumping it
-means regenerating them (`docs/operations.md`, "Bumping the Python version").
+means regenerating them (`docs/operations.md`, "Change the Python version the suite runs on").
 
 ## Changes to the two yt files
 
