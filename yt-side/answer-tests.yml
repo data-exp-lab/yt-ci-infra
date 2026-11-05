@@ -13,6 +13,10 @@ on:
       groups:
         description: "Comma-separated answer-test group keys from tests/tests.yaml (blank = all)"
         required: false
+      store_missing:
+        description: "Keep the answers generated for groups that have no store yet (they become the baseline). Off: such groups fail."
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -98,11 +102,12 @@ jobs:
       - name: Run answer tests
         env:
           YT_TEST_GROUPS: ${{ needs.resolve.outputs.groups }}
+          YT_STORE_MISSING: ${{ inputs.store_missing }}
         run: |
           uv run --no-sync yt config set --local yt test_data_dir "${YT_TEST_DATA_DIR:?not exported by the runner}"
           rm -f ./*.xml
           export NUM_WORKERS=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
-          echo "NUM_WORKERS=$NUM_WORKERS groups='${YT_TEST_GROUPS}'"
+          echo "NUM_WORKERS=$NUM_WORKERS groups='${YT_TEST_GROUPS}' store_missing='${YT_STORE_MISSING}'"
           uv run --no-sync python tests/nose_runner.py
 
       - name: Upload xunit results

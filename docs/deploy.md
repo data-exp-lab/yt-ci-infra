@@ -140,7 +140,7 @@ sudo ANSWERS_DEV=/dev/sdb ./infra/seed-answers-volume.sh format  # the 50G devic
 
 The answers script only formats the volume and leaves an empty `answers/` directory, root-owned
 until `provision.sh` (section 3) creates the runner user and chowns it. The stores themselves
-come from the first baseline run of the suite (`operations.md`, "Baseline / store runs"); they
+come from the first baseline run of the suite (`operations.md`, "Answer stores: baselines and bumps"); they
 cannot be seeded from outside the worker.
 
 Budget: the dataset pull is the slow part; do it before provisioning so a provisioning mistake
@@ -260,8 +260,9 @@ Validates the worker image, volume mounts, JIT handoff, ephemeral runner, the su
 reporting, with the controller only serving configs. Leave `yt-controller.service` stopped and run
 `yt-controller serve` in a tmux instead, so nothing shelves the worker under you.
 
-0. No answer stores exist yet, so the first run of every group is a store run followed by a
-   compare run (`operations.md`, "Answer stores"). Nothing to configure for that.
+0. No answer stores exist yet. The first dispatch has to set `store_missing`, and every group
+   is then a store run followed by a compare run (`operations.md`, "Answer stores"). Without it
+   every group fails and nothing is written.
 1. On the controller, start the config endpoint in a tmux session so it outlives your ssh login:
 
    ```

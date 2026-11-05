@@ -39,6 +39,7 @@ Dispatch inputs:
 | `pr` | PR number; tests its current head SHA |
 | `ref` | any ref or SHA (for bisecting, tags, the last-known-good commit); ignored if `pr` is set |
 | `groups` | comma-separated `tests/tests.yaml` answer-test keys to run; blank = everything |
+| `store_missing` | boolean, default off. On: a group with no answer store keeps the answers this run generates, and they are the baseline from then on. Off: such a group fails (its generated store is discarded). Either way a group whose datasets are missing is skipped, not failed. |
 
 The workflow does not know where the data lives. `YT_TEST_DATA_DIR` and the `PATH` entry for
 `uv` are exported into the runner's environment by `boot-runner.sh` on the worker, from
@@ -58,12 +59,16 @@ otherwise built exactly as before.
 |------|--------------|--------|
 | `--groups a,b` | `YT_TEST_GROUPS` | run only those `answer_tests` keys; unknown keys exit nonzero before anything runs |
 | `--unittests` / `--no-unittests` | | run `other_tests` (the unittests job). Default: yes, unless `--groups` is given |
+| `--store-missing` / `--no-store-missing` | `YT_STORE_MISSING` | keep the stores generated for groups that have none (default off: those groups fail). `docs/operations.md`, "Answer stores" |
 | `--num-workers N` | `NUM_WORKERS` | parallel nose processes (default 6) |
 
 The filter is applied in memory; `tests/tests.yaml` is never rewritten. The unittests job
 still excludes every answer test from the full file, not just the selected groups. Each
 `nose.run` result is collected and the script exits 1 naming the failed runs, so the workflow
-step fails without parsing xunit XML. (Upstream always exits 0.)
+step fails without parsing xunit XML. (Upstream always exits 0.) Groups whose datasets are
+missing are listed as skipped. In a full run they do not affect the exit code; when `--groups`
+names them, the run fails, so a new group dispatched by name before its data is seeded is red
+rather than a quiet skip.
 
 The install step passes `--reinstall-package yt`. yt's editable install compiles its Cython
 extensions in place in the source tree; on a self-hosted runner the work directory persists
