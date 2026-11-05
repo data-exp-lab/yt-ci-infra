@@ -39,7 +39,7 @@ Dispatch inputs:
 | `pr` | PR number; tests its current head SHA |
 | `ref` | any ref or SHA (for bisecting, tags, the last-known-good commit); ignored if `pr` is set |
 | `groups` | comma-separated `tests/tests.yaml` answer-test keys to run; blank = everything |
-| `store_missing` | boolean, default off. On: a group with no answer store keeps the answers this run generates, and they are the baseline from then on. Off: such a group fails (its generated store is discarded). Either way a group whose datasets are missing is skipped, not failed. |
+| `store_missing` | boolean, default off. On: a group with no answer store keeps the answers this run generates, and they are the baseline from then on. Off: such a group fails (its generated store is discarded). Either way a group with no store whose datasets are missing is skipped, not failed (the runner sets yt's `strict_requires` so missing data cannot produce an empty store). A group that has a store and is missing a dataset fails its compare pass. |
 
 The workflow does not know where the data lives. `YT_TEST_DATA_DIR` and the `PATH` entry for
 `uv` are exported into the runner's environment by `boot-runner.sh` on the worker, from

@@ -80,9 +80,11 @@ group (`yt-side/nose_runner.py`):
     with a log line saying to dispatch again with `store_missing` to accept it. The group's
     runtime was spent once for nothing; that is the cost of the forgotten checkbox, and the
     re-dispatch is the approval.
-  - It writes no file (yt marks the results tainted and skips the dump when any dataset in the
-    group is missing): the group is skipped, not failed, and the run ends with
-    `SKIPPED, datasets missing (N): ...`. Seed the data (see "Dataset pre-flight") and it
+  - It writes no file: a dataset in the group is missing. The runner turns on yt's
+    `internals.strict_requires` before forking its workers, so a missing dataset is a
+    collection error that taints the results and suppresses the dump, instead of a silent skip
+    that writes an empty or partial store. The group is skipped, not failed, and the run ends
+    with `SKIPPED, datasets missing (N): ...`. Seed the data (see "Dataset pre-flight") and it
     stores on the next dispatch with `store_missing`. A skipped group says nothing about the
     ref, so keep that list short. With `groups` blank a skip is not a failure; with `groups`
     naming the skipped group the run fails, so the usual new-frontend case (new group, data not
@@ -239,9 +241,12 @@ version just runs against the new stores, and a PR that does not still runs agai
 
 ## Dataset pre-flight
 
-The answer framework silently skips writing a store if any dataset in the group is missing,
-which looks like a store that never appears. So `infra/datasets.json` has to be right before
-the first baseline run. It is a list, one entry per file to download from
+With `strict_requires` on (the runner sets it), a missing dataset errors at collection and
+the group writes no store; the run reports it under `SKIPPED, datasets missing`. With it off,
+yt's default, the test silently skips and an empty or partial store is written, which would
+then be the baseline. So `infra/datasets.json` has to be right before the first baseline run.
+A group that already has a store and loses a dataset (or gains a test whose data is not
+seeded) fails its compare pass for the same reason, rather than skipping green. It is a list, one entry per file to download from
 https://yt-project.org/data/:
 
 ```json
@@ -258,10 +263,12 @@ tarballs and gunzips anything else, keeping the compressed copy (one FITS test w
 seeding script (`deploy.md` step 2) and is the input to both `fetch` and `verify`.
 
 **Keeping it current.** The normal path is incremental. After a run, look for datasets the
-suite wanted and did not find; both decorators skip with a reason that names the dataset:
+suite wanted and did not find. `requires_file` skips with a reason naming the file;
+`requires_ds` under `strict_requires` raises `FileNotFoundError` naming the path at import,
+so only the first missing dataset per test module shows up per run:
 
 ```
-grep -hoE "(cannot load dataset|Missing required file) [^ ]+" <run log> | sort -u
+grep -hoE "Missing required file [^ ]+|No such file or directory: '[^']+'" <run log> | sort -u
 ```
 
 Find the tarball on the data page, add an entry, re-run `fetch` on the worker (it skips what
