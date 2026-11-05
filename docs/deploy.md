@@ -250,8 +250,7 @@ that lives only on a feature branch does not appear in the Actions tab and `gh w
 cannot find it. On the fork the least invasive fix is to make the feature branch the default
 for the duration (`gh repo edit chrishavlin/yt --default-branch <branch>`), switching back
 afterwards; merging into the fork's `main` also works. Once indexed, a dispatch can target
-any ref that carries the file. The `/run-answer-tests` comment path likewise reads the
-workflow from the default branch.
+any ref that carries the file.
 
 The workflow's `runs-on: [self-hosted, jetstream]` label must match `RUNNER_LABEL`.
 
@@ -304,7 +303,6 @@ should unshelve on the queued job and shelve after `GRACE_SECONDS`. That is v1.
 - New fine-grained PAT (or GitHub App) with resource owner `yt-project`, repository `yt` only,
   same permissions. Org fine-grained PATs may need admin approval; a GitHub App avoids that.
 - Edit `/etc/yt-controller/env`: `GITHUB_REPO=yt-project/yt`, new token. `systemctl restart yt-controller`.
-- Open the workflow PR to yt-project/yt. The `issue_comment` trigger reads the workflow from
-  `main`, so `/run-answer-tests` only works after merge; `workflow_dispatch` works immediately
-  from the PR branch.
+- Open the workflow PR to yt-project/yt. `workflow_dispatch` only appears on yt-project/yt
+  once the file is on `main`; until it merges, runs go through the fork.
 - Nothing to deregister on the fork: ephemeral runners clean up after themselves.

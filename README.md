@@ -13,11 +13,11 @@ a machine and hand it a runner config.
 
 ```
  GitHub (yt repo)                      Jetstream2 allocation
- PR comment by maintainer              ┌──────────────────────────────────────┐
+ maintainer dispatches (Actions tab)   ┌──────────────────────────────────────┐
    │                                   │ private network, outbound-only       │
    ▼                                   │  ┌──────────────┐   OpenStack API    │
- authorize job (ubuntu-latest)         │  │ controller   │──────────────┐     │
-   │ pins SHA, checks permission       │  │ m3.tiny      │              ▼     │
+ resolve job (ubuntu-latest)           │  │ controller   │──────────────┐     │
+   │ pins the SHA to test              │  │ m3.tiny      │              ▼     │
    ▼                                   │  │ always on    │  unshelve / shelve │
  answer-tests job queued               │  │ floating IP  │              │     │
  runs-on: [self-hosted, jetstream]     │  └──────┬───────┘              ▼     │

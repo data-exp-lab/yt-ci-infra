@@ -19,15 +19,12 @@ When any of those change, change both copies. During v0/v1 the live copies are o
 
 ## What the workflow does
 
-- Triggers: `workflow_dispatch` (anyone with write access, via the Actions tab) and an
-  `issue_comment` on a PR whose entire body is `/run-answer-tests` (a comment that merely
-  contains it, or adds anything after it, fails in `authorize`; the comment body is never
-  parsed). Comment-triggered runs use the workflow file from the default branch, so a PR
-  cannot alter the gate. Subsets of groups are `workflow_dispatch` only.
-- `authorize` (on `ubuntu-latest`, free): for comments, requires the commenter to have
-  `admin`, `maintain`, or `write` permission (not `triage`, not `author_association`). Pins
-  the SHA to test at that moment, so a later push to the PR does not run. Reacts 🚀 to the
-  comment.
+- Trigger: `workflow_dispatch` only, from the Actions tab or `gh workflow run`. GitHub
+  restricts dispatch to users with write access, so that is the whole authorization story:
+  untrusted code never reaches the worker unless a maintainer chooses to run it.
+- `resolve` (on `ubuntu-latest`, free): turns the `pr` or `ref` input into a SHA and pins it,
+  so a later push to the PR does not change what runs. A bad PR number or ref fails here
+  before the worker is woken up.
 - `answer-tests` (on `[self-hosted, jetstream]`): checks out exactly that SHA, then mirrors
   the nose answer job that `build-test.yaml` used to have: `ci_install.sh` with
   `--extra=full --group=nosetest` on `PYTHON_VERSION`, the nose `collections.Callable`

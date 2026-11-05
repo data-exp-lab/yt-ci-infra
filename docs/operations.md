@@ -64,8 +64,8 @@ runner configs.
 The answers volume is always mounted read-write. There is no read-only mode: yt's answer plugin
 opens a store with `shelve.open` in its default create mode, which needs write access even to
 compare (gdbm refuses to open an existing file read-write on a read-only filesystem). The guard
-against untrusted code writing a baseline is the `authorize` job in the workflow, which only lets
-maintainers dispatch, the same trust the Jenkins box ran on.
+against untrusted code writing a baseline is that the workflow runs only on `workflow_dispatch`,
+which GitHub restricts to users with write access, the same trust the Jenkins box ran on.
 
 What a run does with stores, per group (`yt-side/nose_runner.py`):
 
