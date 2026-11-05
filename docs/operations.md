@@ -328,7 +328,7 @@ yt-project/yt): only the store files matter, and they are the same files either 
 **1. Build the branch (laptop).** yt's code at the trusted ref, the harness files on top:
 
 ```
-git checkout -b baseline-66af53c 66af53cedb7af599faf3c2471bcd380d961e37a6
+git checkout -b last-known-jenkins-pass-66af53c 66af53cedb7af599faf3c2471bcd380d961e37a6
 git checkout <harness-branch> -- tests/nose_runner.py tests/ci_install.sh tests/tests.yaml
 ```
 
@@ -367,7 +367,7 @@ sudo -iu runner
 tmux new -s baseline
 . /etc/yt-runner/env
 export PATH="$HOME/.local/bin:$PATH" MPLCONFIGDIR=tests
-git clone --recurse-submodules --branch baseline-66af53c https://github.com/<fork>/yt ~/baseline
+git clone --recurse-submodules --branch last-known-jenkins-pass-66af53c https://github.com/chrishavlin/yt ~/baseline
 cd ~/baseline
 sync_args="--extra=full --group=nosetest" UV_PYTHON=3.10 YT_CI_SKIP_SYSTEM_DEPS=1 source tests/ci_install.sh
 find .venv/lib/python3.10/site-packages/nose -name '*.py' -exec sed -i -e 's/collections.Callable/collections.abc.Callable/g' '{}' ';'
@@ -375,7 +375,6 @@ uv run --no-sync yt config set --local yt test_data_dir "$YT_TEST_DATA_DIR"
 export NUM_WORKERS=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
 uv run --no-sync python tests/nose_runner.py --no-unittests --store-missing 2>&1 | tee ~/baseline-$(date +%F).log
 ```
-
 This is the workflow's job, step for step, minus the xunit upload and commit status.
 `--no-unittests` skips the `other_tests` job, which writes no stores; drop the flag to also get
 a unittest result for the ref. Every group runs twice (store, then compare), so expect the run
