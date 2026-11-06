@@ -44,6 +44,22 @@
   "datafile": "BigEndianGadgetBinary.tar.gz"
  },
  {
+  "datafile": "bw_cartesian_3d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
+  "datafile": "bw_cylindrical_3d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
+  "datafile": "bw_polar_2d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
+  "datafile": "bw_spherical_2d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
   "datafile": "C15-3D-3deg.tar.gz"
  },
  {
@@ -213,6 +229,14 @@
   "datafile": "KeplerianRing.tar.gz"
  },
  {
+  "datafile": "kh2d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
+  "datafile": "kh3d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
   "datafile": "LangmuirWave_v2.tar.gz",
   "note": "unpacks to LangmuirWave"
  },
@@ -237,6 +261,10 @@
  },
  {
   "datafile": "MHD_Cyl3d_hdf5_plt_cnt_0100.tar.gz"
+ },
+ {
+  "datafile": "mhd_jet.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
  },
  {
   "datafile": "MHDBlast.tar.gz"
@@ -340,9 +368,17 @@
   "datafile": "ramses_star_formation.tar.gz"
  },
  {
+  "datafile": "riemann1d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
+ },
+ {
   "datafile": "riot_sedov_curvlinear.tar.gz",
   "url": "https://cloud.hs.uni-hamburg.de/s/J6NETRRwj8Zifgs/download",
   "note": "not on the data page yet; author's share linked from website PR 141"
+ },
+ {
+  "datafile": "rmi_dust_2d.tar.gz",
+  "note": "amrvac per-run tarball (website PR 97); the amrvac tests still load the pre-2021 amrvac/*.dat layout, so unused until the yt tests are repointed"
  },
  {
   "datafile": "rockstar_halos.tar.gz"

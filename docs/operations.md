@@ -505,10 +505,11 @@ Known gaps as of 2026-11-03, all tests that skip:
 - amrvac. The tests load `amrvac/bw_2d0000.dat` and friends, the layout of the pre-2021
   tarballs (`amrvac_*.tar.gz`, no longer on the server). Website PR 97 replaced those
   manifest entries with nine per-run tarballs (`bw_polar_2d.tar.gz`, `kh2d.tar.gz`,
-  `riemann1d.tar.gz` and so on, about 40 MB in all, on the server but not in the list) that
-  unpack to different names and files, and the tests were never updated to match. The fix is
-  in the yt tests; add the nine entries when it lands. Until then the amrvac group skips, and
-  the amrvac units-override unittests and one plot-modifications unittest error.
+  `riemann1d.tar.gz` and so on, about 30 MB in all) that unpack to `<stem>/output0001.dat`
+  (`mhd_jet/Jet0003.dat`), and the tests were never updated to match. The nine are in the
+  list and on the volume since 2026-11-06, so the fix is only in the yt tests: point them at
+  the per-run names and bump the group. Until then the amrvac group skips, and the amrvac
+  units-override unittests and one plot-modifications unittest error.
 - `output_00080_new_halos` (AdaptaHOP, website PR 109): its only copy was on use.yt and is
   gone.
 

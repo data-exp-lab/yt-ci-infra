@@ -9,8 +9,9 @@
 # datasets.json is infra/datasets.json in yt-ci-infra: a list of
 # {"datafile", "unpack_to"?, "url"?, "note"?}. datafile is a file name, fetched from
 # https://yt-project.org/data/<datafile> unless url gives a full download URL instead. Tarballs
-# (.tar.gz, .tgz) are extracted; any other .gz is gunzipped with the compressed copy kept; any
-# other file is copied as-is. unpack_to is a directory under the volume root to unpack into;
+# (.tar.gz, .tgz) are extracted, dropping macOS `._*` AppleDouble entries (several tarballs
+# carry one beside the top-level directory); any other .gz is gunzipped with the compressed
+# copy kept; any other file is copied as-is. unpack_to is a directory under the volume root to unpack into;
 # omitted, the entry unpacks at the root. How the list was built: docs/operations.md,
 # "Dataset pre-flight".
 #
@@ -64,8 +65,8 @@ fetch_one() {
     curl -fsSL -o "$tmp" "$url" || { rm -f "$tmp"; return 1; }
     case "$df" in
         *.tar.gz|*.tgz)
-            tar --warning=no-unknown-keyword -tzf "$tmp" | cut -d/ -f1 | sort -u | sed "s|^|$prefix|" >"$MARK/$df.tmp" || return 1
-            tar --warning=no-unknown-keyword -xzf "$tmp" -C "$dir" || return 1
+            tar --warning=no-unknown-keyword --exclude='._*' -tzf "$tmp" | cut -d/ -f1 | sort -u | sed "s|^|$prefix|" >"$MARK/$df.tmp" || return 1
+            tar --warning=no-unknown-keyword --exclude='._*' -xzf "$tmp" -C "$dir" || return 1
             rm -f "$tmp"
             ;;
         *.gz)
