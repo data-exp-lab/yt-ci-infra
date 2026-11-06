@@ -24,6 +24,11 @@
   "datafile": "AM06.tar.gz"
  },
  {
+  "datafile": "apec_emissivity_v3.h5",
+  "unpack_to": "supp_data",
+  "note": "bare file on the site, copied as-is; yt looks for the x-ray tables in supp_data_dir, which the job sets to <test_data_dir>/supp_data (varia group)"
+ },
+ {
   "datafile": "ArepoBullet.tar.gz"
  },
  {
@@ -62,6 +67,11 @@
   "datafile": "ChollaSimple.tar.gz"
  },
  {
+  "datafile": "cloudy_emissivity_v2.h5",
+  "unpack_to": "supp_data",
+  "note": "bare file on the site, copied as-is; yt looks for the x-ray tables in supp_data_dir, which the job sets to <test_data_dir>/supp_data (varia group)"
+ },
+ {
   "datafile": "cm1_tornado_lofs.tar.gz"
  },
  {
@@ -84,6 +94,10 @@
  },
  {
   "datafile": "EAGLE_6.tar.gz"
+ },
+ {
+  "datafile": "Enzo_64.tar.gz",
+  "note": "cookbook recipes only"
  },
  {
   "datafile": "enzo_cosmology_plus.tar.gz"
@@ -132,6 +146,14 @@
   "datafile": "GadgetDiskGalaxy.tar.gz"
  },
  {
+  "datafile": "GalaxyClusterMerger.tar.gz",
+  "note": "cookbook recipes only"
+ },
+ {
+  "datafile": "GasSloshing.tar.gz",
+  "note": "cookbook recipes only; the frontend tests use GasSloshingLowRes"
+ },
+ {
   "datafile": "GasSloshingLowRes.tar.gz"
  },
  {
@@ -161,6 +183,10 @@
  },
  {
   "datafile": "hello-0210.tar.gz"
+ },
+ {
+  "datafile": "HiresIsolatedGalaxy.tar.gz",
+  "note": "cookbook recipes only"
  },
  {
   "datafile": "InteractingJets.tar.gz"
@@ -198,6 +224,10 @@
  },
  {
   "datafile": "maestro_subCh_plt00248.tar.gz"
+ },
+ {
+  "datafile": "maestro_xrb_lores_23437.tar.gz",
+  "note": "cookbook recipes only"
  },
  {
   "datafile": "magneticum_camels.tar.gz"
@@ -252,6 +282,10 @@
  },
  {
   "datafile": "owls_fof_halos.tar.gz"
+ },
+ {
+  "datafile": "owls_ion_data.tar.gz",
+  "note": "yt downloads this into test_data_dir on the first OWLS or EAGLE load; seeded so the read-only volume never has to"
  },
  {
   "datafile": "parthenon_advection.tar.gz"
@@ -318,6 +352,14 @@
  },
  {
   "datafile": "SecondOrderTets.tar.gz"
+ },
+ {
+  "datafile": "SecondOrderTris.tar.gz",
+  "note": "cookbook recipes only"
+ },
+ {
+  "datafile": "Sedov3D.tar.gz",
+  "note": "unpacks to Sedov_3d; cookbook recipes only"
  },
  {
   "datafile": "sedov_1d_sph_plt00120.tar.gz"

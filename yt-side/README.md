@@ -92,5 +92,6 @@ export PATH="$HOME/.local/bin:$PATH" MPLCONFIGDIR=tests
 sync_args="--extra=full --group=nosetest" UV_PYTHON=3.10 YT_CI_SKIP_SYSTEM_DEPS=1 source tests/ci_install.sh
 find .venv/lib/python3.10/site-packages/nose -name '*.py' -exec sed -i -e 's/collections.Callable/collections.abc.Callable/g' '{}' ';'
 uv run --no-sync yt config set --local yt test_data_dir "$YT_TEST_DATA_DIR"
+uv run --no-sync yt config set --local yt supp_data_dir "$YT_TEST_DATA_DIR/supp_data"
 uv run --no-sync python tests/nose_runner.py --groups local_art_004
 ```

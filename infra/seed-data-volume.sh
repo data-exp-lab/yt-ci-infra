@@ -9,9 +9,10 @@
 # datasets.json is infra/datasets.json in yt-ci-infra: a list of
 # {"datafile", "unpack_to"?, "url"?, "note"?}. datafile is a file name, fetched from
 # https://yt-project.org/data/<datafile> unless url gives a full download URL instead. Tarballs
-# (.tar.gz, .tgz) are extracted; any other .gz is gunzipped with the compressed copy kept.
-# unpack_to is a directory under the volume root to unpack into; omitted, the entry unpacks at
-# the root. How the list was built: docs/operations.md, "Dataset pre-flight".
+# (.tar.gz, .tgz) are extracted; any other .gz is gunzipped with the compressed copy kept; any
+# other file is copied as-is. unpack_to is a directory under the volume root to unpack into;
+# omitted, the entry unpacks at the root. How the list was built: docs/operations.md,
+# "Dataset pre-flight".
 #
 # Each file is downloaded whole to <volume>/.tmp before unpacking, so a failed download leaves
 # nothing half-extracted. A seeded entry leaves <volume>/.seeded/<datafile> listing the top-level
@@ -59,10 +60,6 @@ for e in json.load(open(sys.argv[1])):
 
 fetch_one() {
     local df="$1" dest="$2" url="${3:-$BASE_URL/$1}" dir="$MNT/${2:-.}" prefix="${2:+$2/}" tmp="$TMP/$1"
-    case "$df" in
-        *.gz) ;;
-        *) echo "don't know how to unpack $df" >&2; return 1 ;;
-    esac
     mkdir -p "$dir" "$TMP"
     curl -fsSL -o "$tmp" "$url" || { rm -f "$tmp"; return 1; }
     case "$df" in
@@ -75,6 +72,10 @@ fetch_one() {
             mv "$tmp" "$dir/$df"
             gunzip -kf "$dir/$df" || return 1
             printf '%s\n' "$prefix$df" "$prefix${df%.gz}" >"$MARK/$df.tmp"
+            ;;
+        *)
+            mv "$tmp" "$dir/$df"
+            printf '%s\n' "$prefix$df" >"$MARK/$df.tmp"
             ;;
     esac
     # tar as root keeps the archive's modes, and laptop-made tarballs carry 700 directories

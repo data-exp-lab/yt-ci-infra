@@ -358,6 +358,21 @@ mountpoint /mnt/yt-data && mountpoint /mnt/yt-answers && ls -ld /mnt/yt-answers/
 Stopping the runner ("Stop and start the runner") guarantees no dispatched job writes stores at
 the same time. The mounts survive the stop; the answers directory must be owned by `runner`.
 
+Then put the datasets volume in write mode for the run:
+
+```
+sudo mount -o remount,rw /mnt/yt-data
+sudo chown -R runner /mnt/yt-data
+```
+
+yt writes side files next to some datasets the first time it loads them: smoothing lengths
+for SPH data (`TipsyGalaxy/galaxy.00300-hsml`, `snipshot_399_z000p000/*.hsml.hdf5`). On the
+read-only mount those loads raise `OSError: Read-only file system`, which fails the tipsy group
+and several unittests. The remount alone is not enough: root's `tar` keeps the tarball's
+owner, so the tree is not writable by `runner` until the chown. Both are undone by the next
+boot, which mounts the volume read-only (`worker/boot-runner.sh`); the side files stay, and
+later runs only read them.
+
 **3. Run as `runner`, in tmux.** Store files are owned by whoever writes them and the dbm format
 is the interpreter's, so this has to be the runner user with its own uv and Python 3.10, not
 `ubuntu`:
@@ -372,6 +387,7 @@ cd ~/baseline
 sync_args="--extra=full --group=nosetest" UV_PYTHON=3.10 YT_CI_SKIP_SYSTEM_DEPS=1 source tests/ci_install.sh
 find .venv/lib/python3.10/site-packages/nose -name '*.py' -exec sed -i -e 's/collections.Callable/collections.abc.Callable/g' '{}' ';'
 uv run --no-sync yt config set --local yt test_data_dir "$YT_TEST_DATA_DIR"
+uv run --no-sync yt config set --local yt supp_data_dir "$YT_TEST_DATA_DIR/supp_data"
 export NUM_WORKERS=$(( $(nproc) > 2 ? $(nproc) - 2 : 1 ))
 uv run --no-sync python tests/nose_runner.py --no-unittests --store-missing 2>&1 | tee ~/baseline-$(date +%F).log
 ```
@@ -391,7 +407,8 @@ ls /mnt/yt-answers/answers            # one py310_<group> directory per answer_t
 openstack volume snapshot create --volume yt-answers --force yt-answers-$(date +%F)
 ```
 
-Restore the services: on the worker start the runner ("Stop and start the runner"), or just
+Restore the services: on the worker `sudo mount -o remount,ro /mnt/yt-data` (the next boot
+does this anyway), then start the runner ("Stop and start the runner"), or just
 shelve it with the full `yt-controller shelve` form from "Force a shelve / unshelve", which the
 next unshelve boots clean; then on the controller start both units ("Stop and start the
 controller"). The clone
@@ -416,9 +433,30 @@ https://yt-project.org/data/:
 `url` gives a full download URL instead, for files that never reached the server. `unpack_to`
 is a directory under the volume root to unpack into, for the few files that are not a tarball
 of one top-level directory; omitted, the file unpacks at the root. `note` is free text. `infra/seed-data-volume.sh` extracts
-tarballs and gunzips anything else, keeping the compressed copy (one FITS test wants the
-`.fits.gz`, another wants the `.fits`). The list is copied to the worker alongside the
+tarballs, gunzips any other `.gz`, keeping the compressed copy (one FITS test wants the
+`.fits.gz`, another wants the `.fits`), and copies anything else as-is. The list is copied to the worker alongside the
 seeding script (`deploy.md` step 2) and is the input to both `fetch` and `verify`.
+
+Two kinds of entry are not datasets. The x-ray emissivity tables (`*_emissivity_v*.h5`) go
+under `supp_data/`: yt looks for them in its `supp_data_dir` config key, not the test data
+dir, so every place that sets `test_data_dir` also sets `supp_data_dir` to
+`$YT_TEST_DATA_DIR/supp_data` (the workflow, the manual run above, `yt-side/README.md`).
+`owls_ion_data.tar.gz` is a table yt would otherwise download into the test data dir on the
+first OWLS or EAGLE load, which the read-only mount refuses.
+
+**DD0010 is not on the server.** The enzo and pw groups, the cookbook and several unittests
+load `DD0010/moving7_0010`, which ships inside the yt repo under `tests/DD0010`. yt resolves a
+dataset name against the current directory and then `test_data_dir`, and the job runs from
+the repo root, so the copy in `tests/` is never found. Copy it onto the volume once, from any
+yt checkout on the worker (the baseline clone, or a job's work tree):
+
+```
+sudo mount -o remount,rw /mnt/yt-data
+sudo cp -r <checkout>/tests/DD0010 /mnt/yt-data/ && sudo chmod -R a+rX /mnt/yt-data/DD0010
+sudo mount -o remount,ro /mnt/yt-data
+```
+
+`verify` does not know about it; check `ls /mnt/yt-data/DD0010` by hand.
 
 **Keeping it current.** The normal path is incremental. After a run, look for datasets the
 suite wanted and did not find. `requires_file` skips with a reason naming the file;
@@ -435,9 +473,11 @@ is already seeded). Also re-check the "known gaps" list below.
 **Rebuilding from scratch** (laptop, how the 2026-11-03 list was made; the first-run skip
 check above is the safety net for anything this misses):
 
-1. Names the tests reference: every string literal in `yt/**/test_*.py`, first path
-   component. Grep the literals rather than the `requires_ds` / `requires_file` calls; most
-   go through a module-level constant. Drop `DD0010`, which ships with yt in `tests/`.
+1. Names the tests reference: every string literal in `yt/**/test_*.py`, and every `load`
+   argument in `doc/source/cookbook/*.py` (the cookbook job runs each recipe; the first list
+   missed seven tarballs this way), first path component. Grep the literals rather than the
+   `requires_ds` / `requires_file` calls; most go through a module-level constant. `DD0010`
+   ships with yt in `tests/` and is copied by hand (above), not fetched.
 2. The site manifest: `curl -sL https://yt-project.org/data/datafiles.json`. The data page is
    rendered from it. Use each entry's `url`; the `filename` field is a display name and differs
    from the URL basename in a few cases.
@@ -463,10 +503,12 @@ fetched what the manifest listed and removal was a decision.
 Known gaps as of 2026-11-03, all tests that skip:
 
 - amrvac. The tests load `amrvac/bw_2d0000.dat` and friends, the layout of the pre-2021
-  tarballs (`amrvac_*.tar.gz`, still on the server). Website PR 97 replaced those manifest
-  entries with per-run tarballs (`bw_polar_2d.tar.gz` and so on, in the list) that unpack to
-  different names and files, and the tests were never updated to match. Deliberately not
-  added; the fix is in the yt tests.
+  tarballs (`amrvac_*.tar.gz`, no longer on the server). Website PR 97 replaced those
+  manifest entries with nine per-run tarballs (`bw_polar_2d.tar.gz`, `kh2d.tar.gz`,
+  `riemann1d.tar.gz` and so on, about 40 MB in all, on the server but not in the list) that
+  unpack to different names and files, and the tests were never updated to match. The fix is
+  in the yt tests; add the nine entries when it lands. Until then the amrvac group skips, and
+  the amrvac units-override unittests and one plot-modifications unittest error.
 - `output_00080_new_halos` (AdaptaHOP, website PR 109): its only copy was on use.yt and is
   gone.
 
